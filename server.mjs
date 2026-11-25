@@ -45,7 +45,7 @@ function startJob(kind, fn) {
   fn(log)
     .then((r) => Object.assign(job, { state: "done", result: r }))
     .catch((e) => {
-      log(`❌ ${e.message}`);
+      log(`Error: ${e.message}`);
       Object.assign(job, { state: "error", error: e.message });
     })
     .finally(() => (busy = null));
@@ -140,7 +140,7 @@ async function handle(req, res) {
     const job = startJob("new-idea", async (log) => {
       await pullIfRemote(cfg.repoPath, log);
       const folder = await generateIdea({ repoPath: cfg.repoPath, idea: idea.trim(), model: cfg.model, log });
-      log(`📁 Created ${folder}/`);
+      log(`Created ${folder}/`);
       const title = idea.trim().split("\n")[0].slice(0, 60);
       const git = await commitAndPush(cfg.repoPath, [folder], `Daily idea: ${folder}\n\n${title}`, { push: cfg.push, log });
       return { folder, ...git };
@@ -163,7 +163,7 @@ async function handle(req, res) {
     const job = startJob("status", async (log) => {
       await pullIfRemote(cfg.repoPath, log);
       await updateIdeaStatus(cfg.repoPath, folder, status);
-      log(`${STATUSES[status].emoji} ${folder}`);
+      log(`Set ${folder} to ${STATUSES[status].label}`);
       return commitAndPush(cfg.repoPath, [folder], `Status of ${folder}: ${STATUSES[status].emoji} ${STATUSES[status].label}`, { push: cfg.push, log });
     });
     return send(res, 202, { jobId: job.id });
@@ -186,4 +186,4 @@ http
       if (!res.headersSent) send(res, e.status || 500, { error: e.message });
     }),
   )
-  .listen(PORT, "127.0.0.1", () => console.log(`🍳 Idea Cooker on http://localhost:${PORT}`));
+  .listen(PORT, "127.0.0.1", () => console.log(`Idea Cooker running on http://localhost:${PORT}`));
