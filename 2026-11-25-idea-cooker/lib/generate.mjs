@@ -33,7 +33,18 @@ async function topFolders(root) {
  *   { type: "folder", folder }            -> only inside that existing folder
  * Reads are confined to the repo. `emit` receives chat events ({ kind: "assistant" | "tool", text }).
  */
-async function runClaude({ root, prompt, scope, resume, model, log, emit }) {
+/** The user's own rule sets from Settings, appended to every prompt. */
+export function rulesBlock(rules = []) {
+  const active = rules.filter((r) => r && r.enabled !== false && String(r.text || "").trim());
+  if (!active.length) return "";
+  return `\n\nThe user has set rules in their settings. Follow them in everything you write or change, unless the request above explicitly asks for something else:\n${active
+    .map((r) => `<rule_set title="${String(r.title || "Rules").replace(/"/g, "'")}">\n${String(r.text).trim()}\n</rule_set>`)
+    .join("\n")}`;
+}
+
+async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules = [], log, emit }) {
+  const prompt = basePrompt + rulesBlock(rules);
+  if (rules.length) log(`Rules: ${rules.map((r) => r.title || "untitled").join(", ")}`);
   const folderRe = scope.type === "new" ? new RegExp(`^${scope.date}-[a-z0-9][a-z0-9-]{0,60}$`) : null;
   let chosen = scope.type === "folder" ? scope.folder : null;
   // A linked repo's clone (scope.clone) becomes the working directory; the ideas repo is added next to it.
@@ -135,12 +146,12 @@ async function runClaude({ root, prompt, scope, resume, model, log, emit }) {
 }
 
 /** New idea: Claude creates `<today>-<slug>/` with README + prototype. */
-export async function cookIdea({ repoPath, idea, model, log, emit = () => {}, saveOnly = false }) {
+export async function cookIdea({ repoPath, idea, model, rules = [], log, emit = () => {}, saveOnly = false }) {
   const root = path.resolve(repoPath);
   const date = today();
   const existing = await topFolders(root);
   const existingLower = new Set(existing.map((n) => n.toLowerCase()));
-  if (FAKE()) return fakeCook({ root, idea, date, existingLower, log, emit, saveOnly });
+  if (FAKE()) return fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, rules });
   if (saveOnly) {
     const prompt = `You are helping with a "daily idea" practice. The user wants to write down an idea now and maybe build it later. Their daily-ideas git repository is your current working directory.
 
@@ -163,7 +174,7 @@ Example README (it has a prototype; yours won't):
 <example_readme>
 ${await example()}
 </example_readme>`;
-    const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, log, emit });
+    const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, rules, log, emit });
     if (!r.folder) throw new Error("Claude didn't write any files.");
     return r;
   }
@@ -191,7 +202,7 @@ Here is the README of an earlier idea, as the example of format and tone:
 ${await example()}
 </example_readme>`;
 
-  const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, log, emit });
+  const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, rules, log, emit });
   if (!r.folder) throw new Error("Claude didn't write any files.");
   await fs.access(path.join(root, r.folder, "README.md")).catch(() => {
     throw new Error(`${r.folder}/README.md is missing.`);
@@ -200,7 +211,7 @@ ${await example()}
 }
 
 /** Follow-up: Claude changes an existing idea, only inside its folder. */
-export async function reviseIdea({ repoPath, folder, message, sessionId, model, log, emit = () => {}, clone = null, cloneLabel = "" }) {
+export async function reviseIdea({ repoPath, folder, message, sessionId, model, rules = [], log, emit = () => {}, clone = null, cloneLabel = "" }) {
   const root = path.resolve(repoPath);
   if (FAKE()) return fakeRevise({ root, folder, message, log, emit, clone, cloneLabel });
   if (clone) {
@@ -223,7 +234,7 @@ Rules:
 - ${RULES} The app commits your changes to ${cloneLabel} and pushes them.
 
 Reply in 1-4 short sentences: what you changed (or the answer), and how to check it.`;
-    return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: true }, resume: sessionId, model, log, emit });
+    return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: true }, resume: sessionId, model, rules, log, emit });
   }
   const prompt = `You're working on one idea in the user's daily-ideas git repository (your current working directory). The idea lives in the folder \`${folder}/\`. If you haven't seen its files in this conversation yet, read its README.md and prototype first.
 
@@ -239,11 +250,11 @@ Make the change. Rules:
 - ${RULES}
 
 Reply in 1-3 short sentences: what you changed (or the answer). The user sees the updated prototype next to your reply.`;
-  return runClaude({ root, prompt, scope: { type: "folder", folder }, resume: sessionId, model, log, emit });
+  return runClaude({ root, prompt, scope: { type: "folder", folder }, resume: sessionId, model, rules, log, emit });
 }
 
 /** Import: files are already copied into `folder`; Claude writes the idea README from the code. */
-export async function describeImport({ repoPath, folder, source, date, model, log, emit = () => {} }) {
+export async function describeImport({ repoPath, folder, source, date, model, rules = [], log, emit = () => {} }) {
   const root = path.resolve(repoPath);
   if (FAKE()) return fakeDescribe({ root, folder, source, date, log, emit });
   const prompt = `The folder \`${folder}/\` in the user's daily-ideas git repository (your current working directory) was just imported from ${source}. It's an idea the user prototyped before they started using this app.
@@ -262,11 +273,11 @@ Example README:
 <example_readme>
 ${await example()}
 </example_readme>`;
-  return runClaude({ root, prompt, scope: { type: "folder", folder }, model, log, emit });
+  return runClaude({ root, prompt, scope: { type: "folder", folder }, model, rules, log, emit });
 }
 
 /** Linked repo: Claude reads the clone and writes the idea README in the ideas repo. The clone isn't changed. */
-export async function describeLinked({ repoPath, folder, clone, cloneLabel, date, model, log, emit = () => {} }) {
+export async function describeLinked({ repoPath, folder, clone, cloneLabel, date, model, rules = [], log, emit = () => {} }) {
   const root = path.resolve(repoPath);
   if (FAKE()) return fakeDescribe({ root, folder, source: cloneLabel, date, log, emit, linked: true });
   const ideaReadme = path.join(root, folder, "README.md");
@@ -286,12 +297,13 @@ Example README:
 <example_readme>
 ${await example()}
 </example_readme>`;
-  return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: false }, model, log, emit });
+  return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: false }, model, rules, log, emit });
 }
 
 /* ---------- test doubles: IDEA_COOKER_FAKE=1 skips Claude ---------- */
 
-async function fakeCook({ root, idea, date, existingLower, log, emit, saveOnly }) {
+async function fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, rules = [] }) {
+  if (rules.length) log(`Rules: ${rules.map((r) => r.title || "untitled").join(", ")}`);
   if (saveOnly) {
     const slug = idea.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").split("-").slice(0, 3).join("-") || "idea";
     let folder = `${date}-${slug}`;

@@ -32,6 +32,20 @@ async function loadConfig() {
 async function saveConfig(cfg) {
   await fs.writeFile(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", "utf8");
 }
+/** Rule sets: [{ id, title, text, enabled }], written by the user in Settings and added to Claude's prompts. */
+function cleanRules(list) {
+  if (list.length > 20) throw httpError(400, "That's more than 20 rule sets.");
+  return list
+    .map((r) => ({
+      id: /^[\w-]{1,40}$/.test(String(r?.id || "")) ? String(r.id) : randomUUID().slice(0, 8),
+      title: String(r?.title || "").trim().slice(0, 60),
+      text: String(r?.text || "").trim().slice(0, 8000),
+      enabled: r?.enabled !== false,
+    }))
+    .filter((r) => r.title || r.text);
+}
+const activeRules = (cfg) => (cfg.rules || []).filter((r) => r.enabled && r.text);
+
 async function requireRepo() {
   const cfg = await loadConfig();
   if (!cfg.repoPath || !cfg.confirmed) throw httpError(409, "Set and confirm your ideas repository in Settings first.");
@@ -147,6 +161,7 @@ async function handle(req, res) {
     }
     if (typeof body.push === "boolean") cfg.push = body.push;
     if (typeof body.model === "string") cfg.model = body.model.trim();
+    if (Array.isArray(body.rules)) cfg.rules = cleanRules(body.rules);
     await saveConfig(cfg);
     return send(res, 200, cfg);
   }
@@ -217,7 +232,7 @@ async function handle(req, res) {
       job.folder = folder;
       let r;
       try {
-        r = await describeLinked({ repoPath: cfg.repoPath, folder, clone: dir, cloneLabel: repo.label, date, model: cfg.model, log, emit });
+        r = await describeLinked({ repoPath: cfg.repoPath, folder, clone: dir, cloneLabel: repo.label, date, model: cfg.model, rules: activeRules(cfg), log, emit });
       } catch (e) {
         // Remove the half-made folder this job just created, so linking can be retried.
         await fs.rm(path.join(cfg.repoPath, folder), { recursive: true, force: true }).catch(() => {});
@@ -248,7 +263,7 @@ async function handle(req, res) {
     if (!folder) {
       const job = startJob("cook", { folder: null, text, saveOnly: !!saveOnly }, async ({ log, emit, job }) => {
         await pullIfRemote(cfg.repoPath, log);
-        const r = await cookIdea({ repoPath: cfg.repoPath, idea: text, model: cfg.model, log, emit, saveOnly: !!saveOnly });
+        const r = await cookIdea({ repoPath: cfg.repoPath, idea: text, model: cfg.model, rules: activeRules(cfg), log, emit, saveOnly: !!saveOnly });
         job.folder = r.folder;
         log(`Created ${r.folder}/`);
         const g = await commitAndPush(cfg.repoPath, [r.folder], `${saveOnly ? "Saved idea" : "Daily idea"}: ${r.folder}\n\n${text.split("\n")[0].slice(0, 72)}`, { push: cfg.push, log });
@@ -271,7 +286,7 @@ async function handle(req, res) {
         const link = await readLink(cfg.repoPath, folder);
         const repo = link ? parseRepoUrl(link.repo) : null;
         const clone = repo ? await ensureClone(REPOS_DIR, repo, log) : null;
-        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, model: cfg.model, log, emit, clone, cloneLabel: repo?.label });
+        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, model: cfg.model, rules: activeRules(cfg), log, emit, clone, cloneLabel: repo?.label });
         const summary = text.split("\n")[0].slice(0, 72);
         let code = null;
         if (clone) code = await commitClone(clone, `${summary}\n\nMade with Idea Cooker.`, { push: cfg.push, log, label: repo.label });
@@ -301,7 +316,7 @@ async function handle(req, res) {
       const imp = await importIntoRepo({ repoPath: cfg.repoPath, input: source, date, log });
       job.folder = imp.folder;
       emit({ kind: "tool", text: `Copied ${imp.fileCount} files into ${imp.folder}/` });
-      const r = await describeImport({ repoPath: cfg.repoPath, folder: imp.folder, source: imp.source, date: imp.date, model: cfg.model, log, emit });
+      const r = await describeImport({ repoPath: cfg.repoPath, folder: imp.folder, source: imp.source, date: imp.date, model: cfg.model, rules: activeRules(cfg), log, emit });
       const g = await commitAndPush(cfg.repoPath, [imp.folder], `Import idea: ${imp.folder}\n\nFrom ${imp.source}`, { push: cfg.push, log });
       await chats.append(imp.folder, [
         { role: "user", text: `Import ${imp.source}`, at: now() },

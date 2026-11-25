@@ -166,6 +166,20 @@
   .check { display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
   .check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
   .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; }
+  dialog { max-height: calc(100vh - 48px); overflow-y: auto; }
+  .rules-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rules-head label { font-size: 14px; font-weight: 600; }
+  .rules-head .btn { height: 32px; padding: 0 8px; color: var(--accent); }
+  .rules { display: grid; gap: 8px; }
+  .rules:empty::before { content: "No rule sets yet."; font-size: 13px; color: var(--ink-3); }
+  .rule { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); transition: opacity .15s; }
+  .rule.off { opacity: .6; }
+  .rule-top { display: flex; align-items: center; gap: 8px; }
+  .rule-top input[type=text] { height: 36px; font-weight: 600; background: var(--surface); }
+  .rule textarea { width: 100%; min-height: 96px; padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); font-size: 14px; line-height: 20px; resize: vertical; transition: border-color .15s, box-shadow .15s; }
+  .rule textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+  .switch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+  .switch input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
   .choice { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
   .opt { display: grid; grid-template-columns: 16px 1fr; gap: 12px; align-items: start; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; transition: border-color .15s, background-color .15s; }
   .opt:hover { border-color: var(--line-strong); }
@@ -318,6 +332,14 @@
       <label for="modelBox">Model</label>
       <input type="text" id="modelBox" placeholder="Claude Code default" spellcheck="false" autocomplete="off">
       <p class="hint2">A model ID such as <code>claude-opus-5-5</code>. Leave empty for the default.</p>
+    </div>
+    <div class="field">
+      <div class="rules-head">
+        <label>Rules for Claude</label>
+        <button class="btn ghost" type="button" id="addRule">+ Add rule set</button>
+      </div>
+      <p class="hint2">Give each set a headline and write its rules. Claude follows every rule set that's on whenever it builds or changes something.</p>
+      <div class="rules" id="rulesList"></div>
     </div>
     <div class="dlg-foot">
       <button class="btn" value="cancel" formnovalidate>Cancel</button>
@@ -926,10 +948,45 @@ $("importGo").addEventListener("click", async () => {
 });
 $("importSrc").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("importGo").click(); } });
 
+/* settings: rule sets */
+function ruleHtml(r) {
+  return `<div class="rule${r.enabled === false ? " off" : ""}" data-id="${esc(r.id || "")}">
+    <div class="rule-top">
+      <input type="text" class="rule-title" value="${esc(r.title || "")}" placeholder="Headline, e.g. UI" aria-label="Rule set headline" maxlength="60">
+      <label class="switch" title="Turn this rule set on or off"><input type="checkbox" class="rule-on"${r.enabled === false ? "" : " checked"}> On</label>
+      <button class="icon-btn rule-del" type="button" aria-label="Delete rule set" title="Delete rule set"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4"/></svg></button>
+    </div>
+    <textarea class="rule-text" aria-label="Rules" maxlength="8000" placeholder="One rule per line, for example:&#10;- No decorative emoji&#10;- Spacing on an 8px grid">${esc(r.text || "")}</textarea>
+  </div>`;
+}
+function renderRules(rules) {
+  $("rulesList").innerHTML = (rules || []).map(ruleHtml).join("");
+}
+function collectRules() {
+  return [...document.querySelectorAll("#rulesList .rule")].map((el) => ({
+    id: el.dataset.id || undefined,
+    title: el.querySelector(".rule-title").value.trim(),
+    text: el.querySelector(".rule-text").value.trim(),
+    enabled: el.querySelector(".rule-on").checked,
+  })).filter((r) => r.title || r.text);
+}
+$("addRule").addEventListener("click", () => {
+  $("rulesList").insertAdjacentHTML("beforeend", ruleHtml({ enabled: true }));
+  $("rulesList").lastElementChild.querySelector(".rule-title").focus();
+});
+$("rulesList").addEventListener("click", (e) => {
+  const del = e.target.closest(".rule-del");
+  if (del) del.closest(".rule").remove();
+});
+$("rulesList").addEventListener("change", (e) => {
+  if (e.target.classList.contains("rule-on")) e.target.closest(".rule").classList.toggle("off", !e.target.checked);
+});
+
 /* settings */
 let checkedPath = null;
 function openSettings() {
   const c = state.config;
+  renderRules(c.rules);
   $("repoPath").value = c.repoPath || "";
   $("pushBox").checked = c.push !== false;
   $("modelBox").value = c.model || "";
@@ -967,7 +1024,7 @@ $("checkBtn").addEventListener("click", checkRepo);
 $("repoPath").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkRepo(); } });
 $("saveBtn").addEventListener("click", async () => {
   const p = $("repoPath").value.trim();
-  const body = { push: $("pushBox").checked, model: $("modelBox").value };
+  const body = { push: $("pushBox").checked, model: $("modelBox").value, rules: collectRules() };
   if (p && (p !== state.config.repoPath || !state.config.confirmed)) {
     if (checkedPath !== p && !(await checkRepo())) return;
     body.repoPath = p;

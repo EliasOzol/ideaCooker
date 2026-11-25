@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { git } from "../lib/git.mjs";
+import { rulesBlock } from "../lib/generate.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const real = process.argv.includes("--real");
@@ -88,11 +89,24 @@ try {
   ok(check.ok && check.ideas === 1 && check.remote, "repo check sees the clone, its remote and 1 idea");
   await api("POST", "/api/config", { repoPath: clone, push: true });
 
+  // --- rule sets: saved in settings, cleaned up, and added to Claude's prompt when on
+  const saved1 = await api("POST", "/api/config", { rules: [
+    { title: "UI", text: "- No decorative emoji\n- Spacing on an 8px grid", enabled: true },
+    { title: "Paused", text: "- Write everything in French", enabled: false },
+    { title: "", text: "" },
+  ] });
+  ok(saved1.rules.length === 2 && saved1.rules.every((r) => r.id), "rule sets are saved (empty ones dropped, ids added)");
+  const cfgBack = await api("GET", "/api/config");
+  ok(cfgBack.rules[0].title === "UI" && cfgBack.rules[1].enabled === false, "rule sets come back from settings");
+  const block = rulesBlock(cfgBack.rules);
+  ok(block.includes('<rule_set title="UI">') && block.includes("8px grid") && !block.includes("French"), "only rule sets that are on go into the prompt");
+
   // --- cook a new idea through the chat endpoint
   const idea = "A plant pot that tweets passive-aggressive messages when you forget to water it";
   let job = await waitJob((await api("POST", "/api/chat", { message: idea })).jobId);
   printLog(job);
   ok(job.state === "done", `cook finished (${job.error || job.result.folder})`);
+  ok(job.log.some((l) => /Rules: UI$/.test(l)), "the cook used the UI rule set (and not the paused one)");
   ok(job.result.pushed, "new idea was pushed");
   const folder = job.result.folder;
   ok(/^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/.test(folder), `folder name ${folder} is <date>-<slug>`);
