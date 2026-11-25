@@ -44,8 +44,22 @@ await fs.writeFile(path.join(old, "README.md"), "# pomodoro\nmy old timer\n");
 await fs.writeFile(path.join(old, "index.html"), "<!doctype html><title>Pomodoro</title><h1>25:00</h1><script>let t=1500</script>\n");
 await fs.writeFile(path.join(old, "node_modules", "junk", "x.js"), "junk");
 
+// An "external" project repo to link: Claude should edit it and the app should push to it.
+const extBare = path.join(tmp, "ext-project.git");
+const extWork = path.join(tmp, "ext-work");
+await must(tmp, ["init", "--bare", "-b", "main", extBare]);
+await must(tmp, ["clone", extBare, extWork]);
+await must(extWork, ["config", "user.email", "test@example.com"]);
+await must(extWork, ["config", "user.name", "e2e"]);
+await fs.writeFile(path.join(extWork, "README.md"), "# Ext Project\n\nA tiny counter page.\n");
+await fs.writeFile(path.join(extWork, "index.html"), "<!doctype html><title>Counter</title><button id=b>0</button><script>let n=0;b.onclick=()=>b.textContent=++n</script>\n");
+await must(extWork, ["add", "."]);
+await must(extWork, ["commit", "-m", "first"]);
+await must(extWork, ["push", "-u", "origin", "main"]);
+const extUrl = "file:///" + extBare.replaceAll("\\", "/");
+
 const server = spawn(process.execPath, [path.join(here, "..", "server.mjs")], {
-  env: { ...process.env, PORT: String(PORT), PREVIEW_PORT: String(PREVIEW), IDEA_COOKER_CONFIG: path.join(tmp, "config.json"), IDEA_COOKER_CHATS: path.join(tmp, "chats"), IDEA_COOKER_FAKE: real ? "" : "1" },
+  env: { ...process.env, PORT: String(PORT), PREVIEW_PORT: String(PREVIEW), IDEA_COOKER_CONFIG: path.join(tmp, "config.json"), IDEA_COOKER_CHATS: path.join(tmp, "chats"), IDEA_COOKER_REPOS: path.join(tmp, "repos"), IDEA_COOKER_FAKE: real ? "" : "1" },
   stdio: ["ignore", "pipe", "inherit"],
 });
 let started = "";
@@ -113,6 +127,34 @@ try {
   const r1 = await fetch(`${base}/api/import`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: path.join(tmp, "nope") }) });
   const bad = await waitJob((await r1.json()).jobId);
   ok(bad.state === "error", "importing a folder that doesn't exist fails cleanly");
+
+  // --- link an existing repo: Claude edits the original, the app pushes there
+  job = await waitJob((await api("POST", "/api/link", { source: extUrl })).jobId);
+  printLog(job);
+  ok(job.state === "done", `link finished (${job.error || job.result.folder})`);
+  const linked = job.result.folder;
+  ok(/^\d{4}-\d{2}-\d{2}-ext-project$/.test(linked), `linked as ${linked}`);
+  const linkTree = await must(remote, ["ls-tree", "-r", "--name-only", "main", linked]);
+  ok(linkTree.includes(`${linked}/idea.json`) && linkTree.includes(`${linked}/README.md`) && !linkTree.includes("index.html"), "ideas repo got idea.json + README, not the project's code");
+  ideas = await api("GET", "/api/ideas");
+  const li = ideas.find((i) => i.folder === linked);
+  ok(li?.repo?.cloned && li.entry === "index.html", `linked idea is listed with its repo (entry ${li?.entry})`);
+  const dup = await fetch(`${base}/api/link`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: extUrl }) });
+  ok(dup.status === 409, "linking the same repo twice is refused");
+  const linkAsk = "Add a reset button";
+  job = await waitJob((await api("POST", "/api/chat", { folder: linked, message: linkAsk })).jobId);
+  printLog(job);
+  ok(job.state === "done" && job.result.code?.pushed, `follow-up on the linked repo was pushed to it (${job.error || "ok"})`);
+  const extLog = await must(extBare, ["log", "-1", "--format=%s", "main"]);
+  ok(extLog === linkAsk, `external repo's latest commit is "${extLog}"`);
+  const extFiles = await must(extBare, ["show", "--name-only", "--format=", "main"]);
+  ok(extFiles.length > 0 && !extFiles.includes("idea.json"), `changed files in the external repo: ${extFiles.split("\n").join(", ")}`);
+  const prevLinked = await fetch(`http://localhost:${PREVIEW}/${linked}/`);
+  ok(prevLinked.ok && (await prevLinked.text()).includes("<"), "linked repo's page is served from its clone");
+  const gitPeek = await fetch(`http://localhost:${PREVIEW}/${linked}/.git/config`);
+  ok(gitPeek.status === 403, "the clone's .git folder isn't served");
+  const repoReadme = await api("GET", `/api/ideas/${linked}/readme?which=repo`);
+  ok(/counter|reset/i.test(repoReadme.text), "panel can show the linked repo's own README");
 
   // --- status light
   const s = await waitJob((await api("POST", `/api/ideas/${folder}/status`, { status: "green" })).jobId);

@@ -5,9 +5,10 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { inspectRepo, pullIfRemote, commitAndPush } from "./lib/git.mjs";
 import { listIdeas, updateIdeaStatus, STATUSES } from "./lib/ideas.mjs";
-import { cookIdea, reviseIdea, describeImport } from "./lib/generate.mjs";
-import { importIntoRepo } from "./lib/importer.mjs";
+import { cookIdea, reviseIdea, describeImport, describeLinked, today } from "./lib/generate.mjs";
+import { importIntoRepo, kebab } from "./lib/importer.mjs";
 import { chatStore } from "./lib/chats.mjs";
+import { parseRepoUrl, readLink, writeLink, ensureClone, cloneDir, firstCommitDate, commitClone, staticEntry } from "./lib/linked.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4321);
@@ -16,6 +17,8 @@ const PREVIEW_PORT = Number(process.env.PREVIEW_PORT || PORT + 1);
 const CONFIG_FILE = process.env.IDEA_COOKER_CONFIG || path.join(here, "config.json");
 const chats = chatStore(process.env.IDEA_COOKER_CHATS || path.join(here, "chats"));
 const PUBLIC_DIR = path.join(here, "public");
+// Clones of linked repos (git-ignored). Claude edits these, and the app pushes them to the original repos.
+const REPOS_DIR = process.env.IDEA_COOKER_REPOS || path.join(here, "repos");
 const FOLDER_RE = /^\d{4}-\d{2}-\d{2}-[\w.-]+$/;
 
 // ---------- config ----------
@@ -153,8 +156,18 @@ async function handle(req, res) {
     if (!cfg.repoPath || !cfg.confirmed) return send(res, 200, []);
     const ideas = await listIdeas(cfg.repoPath);
     for (const i of ideas) {
-      i.entry = entryOf(i.files);
       i.hasChat = await chats.has(i.folder);
+      const link = await readLink(cfg.repoPath, i.folder);
+      if (link) {
+        const repo = parseRepoUrl(link.repo);
+        const dir = cloneDir(REPOS_DIR, repo);
+        const cloned = !!(await fs.stat(path.join(dir, ".git")).catch(() => null));
+        i.repo = { label: repo.label, web: repo.web, cloned };
+        i.entry = cloned ? await staticEntry(dir) : null;
+        i.hasRepoReadme = cloned && !!(await fs.stat(path.join(dir, "README.md")).catch(() => null));
+      } else {
+        i.entry = entryOf(i.files);
+      }
     }
     return send(res, 200, ideas);
   }
@@ -162,9 +175,60 @@ async function handle(req, res) {
   let m;
   if (req.method === "GET" && (m = p.match(/^\/api\/ideas\/([\w.-]+)\/readme$/))) {
     const cfg = await requireRepo();
-    const text = await fs.readFile(path.join(cfg.repoPath, checkFolder(m[1]), "README.md"), "utf8").catch(() => null);
+    const folder = checkFolder(m[1]);
+    let file = path.join(cfg.repoPath, folder, "README.md");
+    if (url.searchParams.get("which") === "repo") {
+      const link = await readLink(cfg.repoPath, folder);
+      if (!link) throw httpError(404, "This idea has no linked repo");
+      file = path.join(cloneDir(REPOS_DIR, parseRepoUrl(link.repo)), "README.md");
+    }
+    const text = await fs.readFile(file, "utf8").catch(() => null);
     if (text === null) throw httpError(404, "No README");
     return send(res, 200, { text });
+  }
+
+  // Link an existing repo as an idea: clone it, write the idea README, commit + push the ideas repo.
+  if (req.method === "POST" && p === "/api/link") {
+    const cfg = await requireRepo();
+    const { source } = await readJson(req);
+    let repo;
+    try {
+      repo = parseRepoUrl(source);
+    } catch (e) {
+      throw httpError(400, e.message);
+    }
+    for (const i of await listIdeas(cfg.repoPath)) {
+      const l = await readLink(cfg.repoPath, i.folder);
+      if (l && parseRepoUrl(l.repo).key === repo.key) throw httpError(409, `${repo.label} is already linked as ${i.folder}.`);
+    }
+    const job = startJob("link", { folder: null, text: `Link ${repo.label}` }, async ({ log, emit, job }) => {
+      await pullIfRemote(cfg.repoPath, log);
+      const dir = await ensureClone(REPOS_DIR, repo, log);
+      emit({ kind: "tool", text: `Cloned ${repo.label}` });
+      const date = (await firstCommitDate(dir)) || today();
+      const existing = new Set((await fs.readdir(cfg.repoPath)).map((n) => n.toLowerCase()));
+      const slug = kebab(repo.name);
+      let folder = `${date}-${slug}`;
+      for (let n = 2; existing.has(folder.toLowerCase()); n++) folder = `${date}-${slug}-${n}`;
+      await fs.mkdir(path.join(cfg.repoPath, folder));
+      await writeLink(cfg.repoPath, folder, { repo: repo.web || repo.url });
+      job.folder = folder;
+      let r;
+      try {
+        r = await describeLinked({ repoPath: cfg.repoPath, folder, clone: dir, cloneLabel: repo.label, date, model: cfg.model, log, emit });
+      } catch (e) {
+        // Remove the half-made folder this job just created, so linking can be retried.
+        await fs.rm(path.join(cfg.repoPath, folder), { recursive: true, force: true }).catch(() => {});
+        throw e;
+      }
+      const g = await commitAndPush(cfg.repoPath, [folder], `Link idea: ${folder}\n\nCode: ${repo.label}`, { push: cfg.push, log });
+      await chats.append(folder, [
+        { role: "user", text: `Link ${repo.label}`, at: now() },
+        { role: "assistant", text: r.reply, tools: toolsOf(job), at: now() },
+      ], r.sessionId);
+      return { folder, reply: r.reply, ...g };
+    });
+    return send(res, 202, { jobId: job.id });
   }
 
   if (req.method === "GET" && (m = p.match(/^\/api\/chat\/([\w.-]+)$/))) {
@@ -202,13 +266,19 @@ async function handle(req, res) {
       try {
         await pullIfRemote(cfg.repoPath, log);
         const chat = await chats.get(folder);
-        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, model: cfg.model, log, emit });
-        const g = await commitAndPush(cfg.repoPath, [folder], `Update ${folder}\n\n${text.split("\n")[0].slice(0, 72)}`, { push: cfg.push, log });
+        const link = await readLink(cfg.repoPath, folder);
+        const repo = link ? parseRepoUrl(link.repo) : null;
+        const clone = repo ? await ensureClone(REPOS_DIR, repo, log) : null;
+        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, model: cfg.model, log, emit, clone, cloneLabel: repo?.label });
+        const summary = text.split("\n")[0].slice(0, 72);
+        let code = null;
+        if (clone) code = await commitClone(clone, `${summary}\n\nMade with Idea Cooker.`, { push: cfg.push, log, label: repo.label });
+        const g = await commitAndPush(cfg.repoPath, [folder], `Update ${folder}\n\n${summary}`, { push: cfg.push, log });
         await chats.append(folder, [
           { role: "user", text, at: now() },
           { role: "assistant", text: r.reply, tools: toolsOf(job), at: now() },
         ], r.sessionId);
-        return { folder, reply: r.reply, ...g };
+        return { folder, reply: r.reply, ...g, code };
       } catch (e) {
         await chats.append(folder, [
           { role: "user", text, at: now() },
@@ -270,8 +340,11 @@ async function handlePreview(req, res) {
   const p = decodeURIComponent(new URL(req.url, "http://x").pathname);
   const m = p.match(/^\/([^/]+)\/(.*)$/);
   if (!m) throw httpError(404, "Not found");
-  const base = path.join(cfg.repoPath, checkFolder(m[1]));
+  const folder = checkFolder(m[1]);
+  const link = await readLink(cfg.repoPath, folder);
+  const base = link ? cloneDir(REPOS_DIR, parseRepoUrl(link.repo)) : path.join(cfg.repoPath, folder);
   let rel = m[2];
+  if (link && rel.split(/[\\/]/)[0] === ".git") throw httpError(403, "Forbidden");
   if (!rel || rel.endsWith("/")) rel += "index.html";
   return serveFile(res, base, rel);
 }

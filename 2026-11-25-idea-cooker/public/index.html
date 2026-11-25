@@ -160,6 +160,19 @@
   .check { display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
   .check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
   .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; }
+  .choice { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .opt { display: grid; grid-template-columns: 16px 1fr; gap: 12px; align-items: start; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; transition: border-color .15s, background-color .15s; }
+  .opt:hover { border-color: var(--line-strong); }
+  .opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .opt input { margin: 3px 0 0; accent-color: var(--accent); }
+  .opt strong { display: block; font-size: 14px; font-weight: 600; }
+  .opt .hint2 { display: block; margin-top: 2px; }
+  .repo-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--sunk); color: var(--ink-2); font-size: 12px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  .repo-chip:hover { color: var(--ink); }
+  .offer { padding: 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); display: grid; gap: 12px; }
+  .offer p { margin: 0; }
+  .offer ul { margin: 0; padding-left: 20px; font: 13px/20px var(--mono); color: var(--ink-2); }
+  .offer .row { display: flex; gap: 8px; flex-wrap: wrap; }
   .err { font-size: 13px; color: var(--red); margin: 0; }
 
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -193,7 +206,7 @@
     </div>
     <div class="side-actions">
       <button class="btn primary" id="newBtn" type="button">New idea</button>
-      <button class="btn" id="importBtn" type="button" title="Add an idea you already built, from a repo link or folder">Import</button>
+      <button class="btn" id="importBtn" type="button" title="Add a project you already built: link its repo or copy it in">Add repo</button>
     </div>
     <div class="side-filter" role="group" aria-label="Filter by status" id="filters"></div>
     <ul class="idea-list" id="ideaList"></ul>
@@ -207,6 +220,7 @@
     <header class="chat-head">
       <button class="icon-btn only-phone" id="openDrawer" type="button" aria-label="Show ideas"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
       <h1 id="chatTitle">New idea</h1>
+      <a class="repo-chip hidden" id="repoChip" target="_blank" rel="noopener"></a>
       <button class="btn hidden" id="showPanel" type="button" title="Show the prototype and README"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M9.5 3v10"/></svg>Preview</button>
     </header>
     <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
@@ -226,6 +240,7 @@
       <div class="tabs" role="tablist">
         <button role="tab" id="tabProto" aria-selected="true" type="button">Prototype</button>
         <button role="tab" id="tabReadme" aria-selected="false" type="button">README</button>
+        <button role="tab" id="tabCode" aria-selected="false" type="button" class="hidden" title="The linked repo's own README">Code</button>
       </div>
       <span class="spacer"></span>
       <label class="status" id="statusBox"><span class="dot" id="statusDot"></span><select id="statusSel" aria-label="Status"></select></label>
@@ -239,13 +254,19 @@
 
 <dialog id="importDlg" aria-labelledby="importTitle">
   <form class="dlg" method="dialog" id="importForm">
-    <h2 id="importTitle">Import an idea</h2>
+    <h2 id="importTitle">Add an existing project</h2>
     <div class="field">
       <label for="importSrc">Repository link or folder</label>
       <input type="text" id="importSrc" placeholder="https://github.com/you/project" spellcheck="false" autocomplete="off">
-      <p class="hint2">A GitHub repo, a subfolder link (…/tree/main/some-folder) or a folder on this PC. The files are copied into a new dated folder, and Claude writes the README to match your other ideas. The original repo isn't changed.</p>
     </div>
-    <div class="field">
+    <fieldset class="choice">
+      <legend class="sr">How to add it</legend>
+      <label class="opt"><input type="radio" name="importMode" value="link" checked>
+        <span><strong>Link the repo</strong><span class="hint2">Claude works in the original repo: it can read and change the code, and each change is committed and pushed there. Your ideas repo gets a README that points to it.</span></span></label>
+      <label class="opt"><input type="radio" name="importMode" value="copy">
+        <span><strong>Copy into your ideas repo</strong><span class="hint2">The files are copied into a new dated folder, and changes happen in the copy. The original isn't touched. Also works for a folder on this PC or a GitHub subfolder link.</span></span></label>
+    </fieldset>
+    <div class="field" id="importDateField">
       <label for="importDate">Date</label>
       <input type="date" id="importDate">
       <p class="hint2">Leave empty to use the date of the project's first commit.</p>
@@ -253,7 +274,7 @@
     <p class="err hidden" id="importErr"></p>
     <div class="dlg-foot">
       <button class="btn" value="cancel" formnovalidate>Cancel</button>
-      <button class="btn primary" type="button" id="importGo">Import</button>
+      <button class="btn primary" type="button" id="importGo">Link</button>
     </div>
   </form>
 </dialog>
@@ -414,7 +435,7 @@ function renderSidebar() {
     .map((i) => `<li><button type="button" class="idea-item" data-folder="${esc(i.folder)}" aria-current="${i.folder === state.folder}">
         <span class="dot ${i.status || ""}${i.folder === busyFolder ? " busy" : ""}"></span>
         <span class="t">${esc(titleOf(i))}</span>
-        <span class="d">${esc(shortDate(i.date))}</span>
+        <span class="d">${esc(shortDate(i.date))}${i.repo ? " · linked repo" : ""}</span>
       </button></li>`).join("") || `<li class="muted" style="padding:8px;font-size:13px">${state.ideas.length ? "Nothing with this status." : "No ideas yet."}</li>`;
   $("newBtn").setAttribute("aria-current", String(state.folder === null));
 }
@@ -456,13 +477,15 @@ function pendingHtml(p) {
   const job = p.job;
   const tools = (job?.events || []).filter((e) => e.kind === "tool").map((e) => e.text);
   let steps = "";
-  if (p.kind === "cook" || p.kind === "import") {
+  if (p.kind === "cook" || p.kind === "import" || p.kind === "link") {
     const s = phase(job);
-    const labels = p.kind === "import" ? [["pull", "Pull the latest"], ["write", "Copy the files and write the README"], ["commit", "Commit"], ["push", "Push"]] : COOK_STEPS;
+    const labels = p.kind === "import" ? [["pull", "Pull the latest"], ["write", "Copy the files and write the README"], ["commit", "Commit"], ["push", "Push"]]
+      : p.kind === "link" ? [["pull", "Pull the latest"], ["write", "Clone the repo and write the idea's README"], ["commit", "Commit"], ["push", "Push"]]
+      : COOK_STEPS;
     steps = `<ul class="steps">${labels.map(([k, l]) => `<li class="${s[k]}"><span class="ind"></span>${l}</li>`).join("")}</ul>`;
   }
   const chips = tools.length ? `<div class="tools">${[...new Set(tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
-  const label = p.kind === "revise" ? "Claude is working on it…" : p.kind === "import" ? "Importing…" : "Cooking your idea…";
+  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…" }[p.kind] || "Cooking your idea…";
   return `${p.userText ? `<div class="msg user">${esc(p.userText)}</div>` : ""}
     <div class="msg assistant"><div class="working"><span class="spinner"></span>${label}</div>${steps}${chips}</div>`;
 }
@@ -483,7 +506,14 @@ function updatePending() {
 
 function renderChat() {
   const idea = current();
-  $("chatTitle").textContent = idea ? titleOf(idea) : state.pending?.kind === "import" ? "Import" : "New idea";
+  $("chatTitle").textContent = idea ? titleOf(idea) : ({ import: "Import", link: "Link a repo" })[state.pending?.kind] || "New idea";
+  const chip = $("repoChip");
+  chip.classList.toggle("hidden", !idea?.repo);
+  if (idea?.repo) {
+    chip.textContent = idea.repo.label;
+    chip.href = idea.repo.web || "#";
+    chip.title = `Claude edits and pushes to ${idea.repo.label}`;
+  }
   const parts = [];
   if (!idea && !(state.pending && !state.pending.folder)) {
     const today = state.ideas.filter((i) => i.date === isoOf(new Date())).length;
@@ -493,7 +523,9 @@ function renderChat() {
     parts.push(`<div class="welcome"><h2>${esc(new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }))}</h2><p>${esc(sub)}</p></div>`);
   }
   if (idea && !state.messages.length && !(state.pending && state.pending.folder === idea.folder)) {
-    parts.push(`<div class="msg assistant"><div class="body md"><p>Ask for a change to ${esc(titleOf(idea))}, like “make it work on phones” or “add a dark mode”, and Claude will edit the prototype and update its README.</p></div></div>`);
+    parts.push(idea.repo
+      ? `<div class="msg assistant"><div class="body md"><p>${esc(titleOf(idea))} is linked to <strong>${esc(idea.repo.label)}</strong>. Ask for a change and Claude will edit the code there; each change is committed and pushed to that repo.</p></div></div>`
+      : `<div class="msg assistant"><div class="body md"><p>Ask for a change to ${esc(titleOf(idea))}, like “make it work on phones” or “add a dark mode”, and Claude will edit the prototype and update its README.</p></div></div>`);
   }
   state.messages.forEach((m, i) => parts.push(i >= state.animateFrom ? messageHtml(m).replace('class="msg ', 'class="msg enter ') : messageHtml(m)));
   state.animateFrom = Infinity;
@@ -502,6 +534,8 @@ function renderChat() {
     const html = pendingHtml(p);
     parts.push(`<div id="pendingBox" class="msg enter" style="display:grid;gap:24px" data-html="${esc(html)}">${html}</div>`);
   }
+  const o = state.offer;
+  if (o && o.folder === state.folder && !p) parts.push(`<div class="msg user enter">${esc(o.text)}</div>`, offerHtml(o));
   $("threadInner").innerHTML = parts.join("");
   const t = $("thread");
   t.scrollTop = t.scrollHeight;
@@ -533,10 +567,13 @@ function renderPanel() {
   }
 
   const hasProto = !!idea.entry;
+  const hasCode = !!idea.repo?.cloned && idea.hasRepoReadme;
   if (!hasProto && state.tab === "proto") state.tab = "readme";
+  if (!hasCode && state.tab === "code") state.tab = "readme";
   $("tabProto").disabled = !hasProto;
-  $("tabProto").setAttribute("aria-selected", String(state.tab === "proto"));
-  $("tabReadme").setAttribute("aria-selected", String(state.tab === "readme"));
+  $("tabProto").title = hasProto ? "" : idea.repo ? "This project needs a build step, so it can't be previewed here" : "No web page to preview";
+  $("tabCode").classList.toggle("hidden", !hasCode);
+  for (const [id, t] of [["tabProto", "proto"], ["tabReadme", "readme"], ["tabCode", "code"]]) $(id).setAttribute("aria-selected", String(state.tab === t));
 
   const sel = $("statusSel");
   sel.innerHTML = (idea.status ? "" : `<option value="">No status</option>`) + Object.entries(LABELS).map(([k, l]) => `<option value="${k}"${idea.status === k ? " selected" : ""}>${l}</option>`).join("");
@@ -555,14 +592,17 @@ function renderPanel() {
     }
     $("openTab").href = src;
   } else {
-    $("openTab").href = `${base}README.md`;
-    const key = `${idea.folder}:${state.previewVersion}`;
+    const which = state.tab === "code" ? "repo" : "idea";
+    // Linked ideas open their GitHub page; others open the README file itself.
+    $("openTab").href = idea.repo?.web || `${base}README.md`;
+    const key = `${idea.folder}:${which}:${state.previewVersion}`;
+    const tab = state.tab;
     if (body.dataset.readme !== key) {
       body.dataset.readme = key;
       body.innerHTML = `<div class="readme"><div class="md muted">Loading…</div></div>`;
-      api("GET", `/api/ideas/${encodeURIComponent(idea.folder)}/readme`)
+      api("GET", `/api/ideas/${encodeURIComponent(idea.folder)}/readme${which === "repo" ? "?which=repo" : ""}`)
         .then(({ text }) => {
-          if (body.dataset.readme !== key || state.tab !== "readme") return;
+          if (body.dataset.readme !== key || state.tab !== tab) return;
           body.innerHTML = `<div class="readme"><div class="md">${md(text)}</div></div>`;
           body.querySelectorAll("a[data-rel]").forEach((a) => { a.href = base + a.dataset.rel; a.target = "_blank"; a.rel = "noopener"; });
         })
@@ -583,6 +623,7 @@ function renderAll() {
 async function select(folder) {
   state.folder = folder || null;
   state.tab = "proto";
+  state.offer = null;
   $("chatError").classList.add("hidden");
   $("app").classList.remove("drawer");
   const h = folder ? `#/${folder}` : "#/";
@@ -639,7 +680,7 @@ async function reattach() {
   const j = await api("GET", `/api/jobs/${id}`).catch(() => null);
   if (!j || j.state !== "running") return;
   const kind = j.kind;
-  const folder = kind === "cook" || kind === "import" ? null : j.folder;
+  const folder = kind === "cook" || kind === "import" || kind === "link" ? null : j.folder;
   if (kind !== "status" && state.folder !== folder) await select(folder);
   const job = await follow(id, kind, j.text || "", folder);
   if (job.state === "done" && job.result?.folder && !folder) return select(job.result.folder);
@@ -652,9 +693,71 @@ function showError(msg) {
   $("chatError").classList.remove("hidden");
 }
 
-async function send() {
+/* ---------- repo links ---------- */
+function repoLinks(text) {
+  const out = new Map();
+  for (const m of String(text).matchAll(/(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)/gi)) {
+    const owner = m[1], repo = m[2].replace(/\.git$/, "").replace(/[.,;:)]+$/, "");
+    const label = `github.com/${owner}/${repo}`;
+    const linked = state.ideas.find((i) => i.repo && i.repo.label.toLowerCase() === label.toLowerCase());
+    out.set(label.toLowerCase(), { label, url: `https://${label}`, linkedAs: linked?.folder || null, linkedTitle: linked ? titleOf(linked) : "" });
+  }
+  return [...out.values()];
+}
+
+function offerHtml(o) {
+  const fresh = o.links.filter((l) => !l.linkedAs);
+  const known = o.links.filter((l) => l.linkedAs);
+  const n = fresh.length;
+  return `<div class="offer msg enter">
+    ${n ? `<p>Your message links ${n === 1 ? "a repo" : `${n} repos`} that Claude can't open yet. Link ${n === 1 ? "it" : "them"} so Claude can read and change the code? Each one becomes its own idea, and changes are pushed to that repo.</p>
+    <ul>${fresh.map((l) => `<li>${esc(l.label)}</li>`).join("")}</ul>` : ""}
+    ${known.length ? `<p>Already linked: ${known.map((l) => `<a href="#/${esc(l.linkedAs)}" data-open="${esc(l.linkedAs)}">${esc(l.linkedTitle)}</a>`).join(", ")}. Open it to chat about that code.</p>` : ""}
+    <div class="row">
+      ${n ? `<button class="btn primary" type="button" data-offer="link">Link ${n === 1 ? "repo" : `${n} repos`}</button>` : ""}
+      <button class="btn" type="button" data-offer="send">${state.folder ? "Send anyway" : "Cook as a new idea instead"}</button>
+      <button class="btn ghost" type="button" data-offer="edit">Edit message</button>
+    </div>
+  </div>`;
+}
+
+/* Link repos one after another, then open the first one with the message ready to send. */
+async function linkRepos(links, followUpText) {
+  let first = null;
+  for (const l of links) {
+    state.folder = null;
+    state.messages = [];
+    history.replaceState(null, "", "#/");
+    const job = await runJob("link", () => api("POST", "/api/link", { source: l.url }), `Link ${l.label}`, null);
+    if (job?.state === "done") first ||= job.result.folder;
+    else break;
+  }
+  if (first) {
+    await select(first);
+    if (followUpText) {
+      $("input").value = followUpText;
+      autosize();
+      updateSend();
+    }
+  } else {
+    renderAll();
+  }
+}
+
+async function send(force = false) {
   const text = $("input").value.trim();
   if (!text || state.pending || !ready()) return;
+  const links = repoLinks(text);
+  const idea = current();
+  const relevant = links.filter((l) => !(idea?.repo && l.label.toLowerCase() === idea.repo.label.toLowerCase()));
+  if (!force && relevant.length) {
+    state.offer = { folder: state.folder, text, links: relevant };
+    $("input").value = "";
+    autosize();
+    renderChat();
+    return;
+  }
+  state.offer = null;
   $("input").value = "";
   autosize();
   const folder = state.folder;
@@ -699,6 +802,7 @@ document.addEventListener("keydown", (e) => {
 
 $("tabProto").addEventListener("click", () => { state.tab = "proto"; renderPanel(); });
 $("tabReadme").addEventListener("click", () => { state.tab = "readme"; renderPanel(); });
+$("tabCode").addEventListener("click", () => { state.tab = "code"; renderPanel(); });
 $("reloadBtn").addEventListener("click", () => { state.previewVersion = Date.now(); renderPanel(); });
 
 $("statusSel").addEventListener("change", async () => {
@@ -710,18 +814,56 @@ $("statusSel").addEventListener("change", async () => {
   renderAll();
 });
 
-/* import */
+$("threadInner").addEventListener("click", async (e) => {
+  const open = e.target.closest("[data-open]");
+  if (open) { e.preventDefault(); state.offer = null; return select(open.dataset.open); }
+  const b = e.target.closest("[data-offer]");
+  if (!b || !state.offer) return;
+  const o = state.offer;
+  if (b.dataset.offer === "edit") {
+    state.offer = null;
+    $("input").value = o.text;
+    autosize();
+    renderChat();
+    $("input").focus();
+  } else if (b.dataset.offer === "send") {
+    state.offer = null;
+    $("input").value = o.text;
+    send(true);
+  } else if (b.dataset.offer === "link") {
+    state.offer = null;
+    await linkRepos(o.links.filter((l) => !l.linkedAs), o.text);
+  }
+});
+
+/* add an existing project: link (edit the original repo) or copy */
+const importMode = () => document.querySelector('input[name="importMode"]:checked').value;
+function syncImportMode() {
+  $("importDateField").classList.toggle("hidden", importMode() === "link");
+  $("importGo").textContent = importMode() === "link" ? "Link" : "Copy";
+}
+document.querySelectorAll('input[name="importMode"]').forEach((r) => r.addEventListener("change", syncImportMode));
 $("importBtn").addEventListener("click", () => {
   if (!ready()) return openSettings();
   $("importErr").classList.add("hidden");
   $("importSrc").value = "";
   $("importDate").value = "";
+  syncImportMode();
   $("importDlg").showModal();
 });
 $("importGo").addEventListener("click", async () => {
   const source = $("importSrc").value.trim();
-  if (!source) { $("importErr").textContent = "Paste a link or a folder path."; $("importErr").classList.remove("hidden"); return; }
-  if (state.pending) { $("importErr").textContent = "Claude is still working on the last request."; $("importErr").classList.remove("hidden"); return; }
+  const err = (t) => { $("importErr").textContent = t; $("importErr").classList.remove("hidden"); };
+  if (!source) return err("Paste a link or a folder path.");
+  if (state.pending) return err("Claude is still working on the last request.");
+  if (importMode() === "link") {
+    if (!/^(https?:\/\/|git@|ssh:\/\/|file:\/\/|(www\.)?github\.com\/)/i.test(source)) return err("Linking needs a repository link. To add a folder from this PC, choose Copy.");
+    $("importDlg").close();
+    const links = repoLinks(source);
+    const already = links.find((l) => l.linkedAs);
+    if (already) return select(already.linkedAs);
+    return linkRepos(links.length ? links : [{ label: source, url: source }], "");
+  }
   $("importDlg").close();
   state.folder = null;
   state.messages = [];

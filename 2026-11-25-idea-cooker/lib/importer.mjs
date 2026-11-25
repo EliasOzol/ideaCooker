@@ -8,7 +8,7 @@ const SKIP = new Set([".git", "node_modules", ".venv", "venv", "__pycache__", ".
 const MAX_BYTES = 50 * 1024 * 1024;
 const MAX_FILES = 3000;
 
-const kebab = (s) =>
+export const kebab = (s) =>
   String(s)
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
     .toLowerCase()

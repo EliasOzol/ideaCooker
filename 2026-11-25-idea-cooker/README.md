@@ -14,7 +14,7 @@ You type today's idea, and Claude turns it into a new `yyyy-mm-dd-<slug>/` folde
 
 The app then commits that folder and pushes it to GitHub.
 
-It works like a chat. Ideas are listed on the left, the conversation is in the middle, and the live prototype (or its README) is on the right. After the first version you keep chatting ("add a dark mode", "make it work on phones"), and every change is committed and pushed. Ideas you built before you had the app can be imported from a GitHub link or a folder. Every idea has a red/yellow/green status that you can change.
+It works like a chat. Ideas are listed on the left, the conversation is in the middle, and the live prototype (or its README) is on the right. After the first version you keep chatting ("add a dark mode", "make it work on phones"), and every change is committed and pushed. Projects that already have their own repo can be **linked**: Claude then reads and changes the code in that repo, and each change is committed and pushed there. Pasting a GitHub link in the chat offers this too. Ideas without a repo can be copied in from a folder instead. Every idea has a red/yellow/green status that you can change.
 
 ## Why
 
@@ -29,6 +29,7 @@ A Node web app in this folder (no framework, one dependency: the [Claude Agent S
 - [`server.mjs`](server.mjs): a local HTTP server on `127.0.0.1:4321` with a small JSON API. Prototypes are served from a second port (4322), a different origin, so their scripts can't call the app's API.
 - [`lib/generate.mjs`](lib/generate.mjs): talks to Claude through your Claude Code login, in three ways: cook a new idea, change an existing one (the chat session is resumed, so Claude remembers the conversation), and write the README for an imported idea. Claude can only read inside the repo and write inside the one idea folder it's working on. It can't run shell commands or touch other ideas.
 - [`lib/importer.mjs`](lib/importer.mjs): copies a GitHub repo, a GitHub subfolder link (`…/tree/main/folder`) or a local folder into a new dated folder. It skips `.git`, `node_modules` and virtualenvs, and dates the idea by its first commit. The original README is kept as `ORIGINAL-README.md`.
+- [`lib/linked.mjs`](lib/linked.mjs): linked repos. A link lives in `<idea>/idea.json`, and the app keeps a clone in `repos/` (git-ignored). For follow-ups, Claude works in that clone, with the ideas repo next to it for the idea's README. The app then commits in the clone and pushes to the original repo. A static `index.html` in the repo shows up as the prototype; apps that need a build step (Vite, npm) show their README instead.
 - [`lib/chats.mjs`](lib/chats.mjs): the chat history for each idea, saved in `chats/` on this PC (git-ignored)
 - [`lib/git.mjs`](lib/git.mjs): `git pull --ff-only` before writing, and then a commit and push of just that idea's folder
 - [`lib/ideas.mjs`](lib/ideas.mjs): finds every `yyyy-mm-dd-<slug>/` folder that has a `README.md`, and reads and writes the 🔴/🟡/🟢 line in its `## Status` section
@@ -66,6 +67,8 @@ That runs the whole flow (cook, follow-up, import, change status, with a push af
 
 - [x] Chat to improve an existing idea's prototype
 - [x] Import ideas built before the app, from a repo link or folder
+- [x] Link existing repos so Claude can edit them and push there
+- [ ] Let Claude run a project's tests (`npm test`) in linked repos, so it can check its own changes
 - [ ] Show in the page whether Claude Code is logged in, before you cook
 - [ ] Stream Claude's reply word by word instead of showing it when it's done
 - [ ] Publish the prototypes with GitHub Pages and link them from the list
