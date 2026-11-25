@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idea Cooker</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --card: #ffffff; --ink: #1d1b18; --muted: #6d675e; --line: #e4dfd5;
+    --accent: #d9622b; --accent-ink: #fff; --red: #e0453a; --yellow: #f0b429; --green: #2f9e5b; --off: #d8d3c9;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171513; --card: #211f1c; --ink: #eeeae3; --muted: #a39d93; --line: #35312c; --off: #3d3934; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: -0.5px; }
+  header .sub { color: var(--muted); }
+  header button { margin-left: auto; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 18px; }
+  h2 { font-size: 15px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  textarea, input[type=text] { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  textarea { min-height: 110px; resize: vertical; }
+  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 8px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .err { color: var(--red); }
+  .facts { font-family: var(--mono); font-size: 13px; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-top: 10px; white-space: pre-wrap; }
+  #log { font-family: var(--mono); font-size: 12.5px; max-height: 260px; overflow: auto; background: var(--bg); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; margin-top: 10px; }
+  .ideas { list-style: none; padding: 0; margin: 0; }
+  .idea { display: grid; grid-template-columns: auto 1fr; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .idea:first-child { border-top: 0; }
+  .light { display: flex; flex-direction: column; gap: 4px; background: #2a2724; padding: 6px; border-radius: 10px; height: fit-content; }
+  .light button { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 0; background: var(--off); opacity: .35; }
+  .light button.on { opacity: 1; box-shadow: 0 0 10px currentColor; }
+  .light button[data-s=red] { color: var(--red); } .light button[data-s=red].on { background: var(--red); }
+  .light button[data-s=yellow] { color: var(--yellow); } .light button[data-s=yellow].on { background: var(--yellow); }
+  .light button[data-s=green] { color: var(--green); } .light button[data-s=green].on { background: var(--green); }
+  .idea h3 { margin: 0; font-size: 17px; }
+  .idea .tag { color: var(--muted); margin: 2px 0 4px; }
+  .idea .meta { font-size: 13px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+  .idea a { color: var(--accent); }
+  .counts { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+  label.check { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🍳 Idea Cooker</h1>
+    <span class="sub">one idea a day, cooked into a prototype</span>
+    <button id="settingsBtn" type="button">Settings</button>
+  </header>
+
+  <section class="card hidden" id="setup">
+    <h2>Your daily-ideas repo</h2>
+    <p class="muted" style="margin-top:0">Path to your local clone of the daily-ideas GitHub repo. Nothing is written or pushed until you save it here.</p>
+    <input type="text" id="repoPath" placeholder="C:\Users\you\code\daily-ideas" spellcheck="false">
+    <div class="row">
+      <button type="button" id="checkBtn">Check</button>
+      <button type="button" class="primary" id="saveBtn" disabled>Use this repo</button>
+      <label class="check"><input type="checkbox" id="pushBox" checked> Push to GitHub after each commit</label>
+    </div>
+    <div class="row">
+      <input type="text" id="modelBox" placeholder="Model (blank = Claude Code default, e.g. claude-opus-5-5)" spellcheck="false" style="max-width:420px">
+    </div>
+    <div id="repoFacts" class="facts hidden"></div>
+  </section>
+
+  <section class="card" id="newIdea">
+    <h2>Today's idea</h2>
+    <form id="ideaForm">
+      <textarea id="ideaText" placeholder="Describe the idea in a few sentences: what it is, who it's for, the twist…"></textarea>
+      <div class="row">
+        <button class="primary" id="cookBtn" type="submit">Cook it</button>
+        <span class="muted" id="cookHint">Claude writes a README + prototype in a new dated folder, then it's committed and pushed.</span>
+      </div>
+    </form>
+    <div id="jobBox" class="hidden">
+      <div class="row"><strong id="jobTitle"></strong></div>
+      <div id="log"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="margin:0 0 6px; justify-content:space-between">
+      <h2 style="margin:0">All ideas</h2>
+      <div class="counts" id="counts"></div>
+    </div>
+    <ul class="ideas" id="ideas"></ul>
+    <p class="muted hidden" id="empty">No ideas yet.</p>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let config = null;
+
+async function api(method, url, body) {
+  const r = await fetch(url, { method, headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+async function loadConfig() {
+  config = await api("GET", "/api/config");
+  const ready = config.repoPath && config.confirmed && config.repo?.ok;
+  $("setup").classList.toggle("hidden", !!ready);
+  $("repoPath").value = config.repoPath || "";
+  $("pushBox").checked = config.push !== false;
+  $("modelBox").value = config.model || "";
+  $("cookBtn").disabled = !ready || !!config.busy;
+  if (ready) {
+    const r = config.repo;
+    $("cookHint").textContent = `→ ${config.repoPath} (${r.branch}${config.push && r.remote ? `, pushes to ${r.remote}` : ", local commits only"})`;
+  } else {
+    $("cookHint").textContent = "Set your daily-ideas repo in Settings first.";
+  }
+}
+
+async function loadIdeas() {
+  const ideas = await api("GET", "/api/ideas");
+  const tally = { red: 0, yellow: 0, green: 0 };
+  $("ideas").innerHTML = ideas.map((i) => {
+    if (i.status) tally[i.status]++;
+    const proto = i.files.find((f) => /\.html?$/i.test(f));
+    return `<li class="idea">
+      <div class="light" role="group" aria-label="Status of ${esc(i.title || i.folder)}">
+        ${["red", "yellow", "green"].map((s) => `<button type="button" data-s="${s}" data-folder="${esc(i.folder)}" class="${i.status === s ? "on" : ""}" title="${config.statuses[s].emoji} ${config.statuses[s].label}" aria-pressed="${i.status === s}"></button>`).join("")}
+      </div>
+      <div>
+        <h3>${esc(i.title || i.folder)}</h3>
+        ${i.tagline ? `<div class="tag">${esc(i.tagline)}</div>` : ""}
+        <div class="meta">
+          <span>${esc(i.date || "undated")}</span>
+          <span>${esc(i.folder)}/</span>
+          <a href="/ideas/${encodeURIComponent(i.folder)}/README.md" target="_blank">README</a>
+          ${proto ? `<a href="/ideas/${encodeURIComponent(i.folder)}/${encodeURIComponent(proto)}" target="_blank">Open prototype</a>` : ""}
+        </div>
+        ${i.statusText ? `<div class="muted">${esc(i.statusText)}</div>` : ""}
+      </div>
+    </li>`;
+  }).join("");
+  $("empty").classList.toggle("hidden", ideas.length > 0);
+  $("counts").innerHTML = ideas.length ? `<span>🔴 ${tally.red}</span><span>🟡 ${tally.yellow}</span><span>🟢 ${tally.green}</span>` : "";
+}
+
+async function followJob(jobId, title) {
+  $("jobBox").classList.remove("hidden");
+  $("jobTitle").textContent = title;
+  $("cookBtn").disabled = true;
+  for (;;) {
+    const job = await api("GET", `/api/jobs/${jobId}`);
+    $("log").textContent = job.log.join("\n");
+    $("log").scrollTop = $("log").scrollHeight;
+    if (job.state !== "running") {
+      $("jobTitle").textContent = job.state === "done" ? `✅ ${title}: done` : `❌ ${title}: failed`;
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  await loadConfig();
+  await loadIdeas();
+}
+
+$("settingsBtn").onclick = () => $("setup").classList.toggle("hidden");
+
+$("checkBtn").onclick = async () => {
+  const box = $("repoFacts");
+  box.classList.remove("hidden");
+  box.textContent = "Checking…";
+  $("saveBtn").disabled = true;
+  try {
+    const r = await api("POST", "/api/repo/check", { repoPath: $("repoPath").value.trim() });
+    if (!r.ok) { box.innerHTML = `<span class="err">${esc(r.error)}</span>`; return; }
+    box.textContent = `repo:      ${r.toplevel}\nbranch:    ${r.branch}${r.upstream ? ` (tracks ${r.upstream})` : " (no upstream)"}\nremote:    ${r.remote || "none – commits will stay local"}\nideas:     ${r.ideas} folder(s) with a README\nuncommitted changes: ${r.dirtyFiles}`;
+    $("saveBtn").disabled = false;
+  } catch (e) { box.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+};
+$("repoPath").oninput = () => ($("saveBtn").disabled = true);
+
+$("saveBtn").onclick = async () => {
+  try {
+    await api("POST", "/api/config", { repoPath: $("repoPath").value.trim(), push: $("pushBox").checked, model: $("modelBox").value });
+    await loadConfig();
+    await loadIdeas();
+  } catch (e) { $("repoFacts").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+};
+$("pushBox").onchange = () => config?.confirmed && api("POST", "/api/config", { push: $("pushBox").checked }).then(loadConfig);
+$("modelBox").onchange = () => config?.confirmed && api("POST", "/api/config", { model: $("modelBox").value }).then(loadConfig);
+
+$("ideaForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const idea = $("ideaText").value.trim();
+  if (!idea) return;
+  try {
+    const { jobId } = await api("POST", "/api/ideas", { idea });
+    $("ideaText").value = "";
+    await followJob(jobId, "Cooking your idea");
+  } catch (err) { alert(err.message); }
+};
+
+$("ideas").onclick = async (e) => {
+  const b = e.target.closest("button[data-s]");
+  if (!b || b.classList.contains("on")) return;
+  try {
+    const { jobId } = await api("POST", `/api/ideas/${encodeURIComponent(b.dataset.folder)}/status`, { status: b.dataset.s });
+    await followJob(jobId, `Status of ${b.dataset.folder}`);
+  } catch (err) { alert(err.message); }
+};
+
+loadConfig().then(loadIdeas).catch((e) => alert(e.message));
+</script>
+</body>
+</html>

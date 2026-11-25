@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrainReminder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* color */
+    --surface: #F3F0E8;
+    --ink: #1B1A17;
+    --muted: #6E6A60;
+    --hairline: #DDD8CC;
+    --accent: #A9462D;
+    --on-accent: #FFFFFF;
+    --scrim: #F3F0E8;
+    /* spacing (8px scale) */
+    --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s6: 48px; --s8: 64px; --s12: 96px;
+    /* type */
+    --display: "Fraunces", Georgia, serif;
+    --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    --radius: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface: #151412; --ink: #EDE9DF; --muted: #8F897D;
+      --hairline: #2C2A26; --accent: #D9714F; --on-accent: #151412; --scrim: #151412;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--surface); }
+  body {
+    margin: 0; min-height: 100vh; background: var(--surface); color: var(--ink);
+    font: 400 16px/1.5 var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 520px; margin: 0 auto;
+    padding: var(--s6) var(--s2) var(--s8);
+  }
+
+  /* header */
+  .brand {
+    font-family: var(--display); font-weight: 700; font-size: 20px;
+    letter-spacing: -0.01em; margin: 0;
+  }
+  .tagline { margin: 0; color: var(--muted); font-size: 14px; }
+
+  /* focal: the clock */
+  .hero { margin-top: var(--s12); }
+  .status { margin: 0 0 var(--s1); color: var(--muted); font-size: 14px; }
+  .clock {
+    font-family: var(--mono); font-weight: 500;
+    font-size: clamp(72px, 22vw, 120px); line-height: 1;
+    letter-spacing: -0.04em; font-variant-numeric: tabular-nums;
+    margin: 0;
+  }
+  .progress { height: 2px; background: var(--hairline); margin-top: var(--s3); overflow: hidden; }
+  .progress > i {
+    display: block; height: 100%; background: var(--accent);
+    transform-origin: left; transform: scaleX(0); transition: transform 250ms linear;
+  }
+
+  .actions { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s4); }
+  .primary {
+    font: 600 16px/1 var(--body); color: var(--on-accent); background: var(--accent);
+    border: 0; border-radius: var(--radius); padding: var(--s2) var(--s4);
+    cursor: pointer; transition: filter 120ms ease;
+  }
+  .primary:hover { filter: brightness(1.08); }
+  .primary:focus-visible, .ghost:focus-visible, .seg input:focus-visible + span {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+  }
+  .ghost {
+    font: 500 15px/1 var(--body); color: var(--muted); background: none; border: 0;
+    padding: var(--s1) 0; cursor: pointer; text-decoration: underline;
+    text-underline-offset: 4px; text-decoration-color: var(--hairline);
+    transition: color 120ms ease, text-decoration-color 120ms ease;
+  }
+  .ghost:hover { color: var(--ink); text-decoration-color: currentColor; }
+
+  /* interval: quiet segmented text */
+  .seg { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); border: 0; padding: 0; }
+  .seg legend { color: var(--muted); font-size: 14px; padding: 0; margin-bottom: var(--s1); float: left; width: 100%; }
+  .seg label { cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span {
+    font-family: var(--mono); font-size: 14px; color: var(--muted);
+    padding-bottom: 2px; border-bottom: 2px solid transparent;
+    transition: color 120ms ease, border-color 120ms ease;
+  }
+  .seg label:hover span { color: var(--ink); }
+  .seg input:checked + span { color: var(--ink); border-color: var(--ink); }
+
+  /* today: one sentence, not a stat bar */
+  .today {
+    margin-top: var(--s12); padding-top: var(--s3); border-top: 1px solid var(--hairline);
+  }
+  .today h2, .tune summary {
+    font-family: var(--display); font-weight: 500; font-size: 18px; margin: 0 0 var(--s1);
+  }
+  .today p { margin: 0; color: var(--muted); }
+  .today b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
+  .today .owed { color: var(--accent); }
+
+  /* challenge editor */
+  .tune { margin-top: var(--s6); padding-top: var(--s3); border-top: 1px solid var(--hairline); }
+  .tune summary { cursor: pointer; list-style: none; margin: 0; }
+  .tune summary::-webkit-details-marker { display: none; }
+  .tune summary::after { content: " +"; color: var(--muted); font-family: var(--body); }
+  .tune[open] summary::after { content: " −"; }
+  .tune p { color: var(--muted); font-size: 14px; margin: var(--s2) 0 var(--s1); }
+  code { font-family: var(--mono); font-size: 13px; }
+  textarea {
+    width: 100%; min-height: 200px; resize: vertical;
+    font: 14px/1.7 var(--mono); color: var(--ink); background: transparent;
+    border: 1px solid var(--hairline); border-radius: var(--radius); padding: var(--s2);
+  }
+  textarea:focus { outline: none; border-color: var(--ink); }
+  .tune .actions { margin-top: var(--s2); }
+  .note { font-size: 14px; color: var(--muted); }
+
+  /* alarm takeover */
+  .alarm {
+    position: fixed; inset: 0; z-index: 10; background: var(--scrim);
+    display: none; overflow-y: auto;
+  }
+  .alarm.show { display: block; }
+  .alarm-inner {
+    max-width: 520px; margin: 0 auto; min-height: 100%;
+    padding: var(--s12) var(--s2) var(--s6);
+    display: flex; flex-direction: column;
+  }
+  .alarm.show .alarm-inner { animation: enter 140ms ease-out; }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } }
+  .alarm .kicker { color: var(--accent); font-weight: 600; font-size: 14px; margin: 0 0 var(--s2); }
+  .challenge {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(40px, 11vw, 64px); line-height: 1.05; letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .challenge em { font-style: normal; color: var(--accent); }
+  .debt { margin: var(--s2) 0 0; color: var(--muted); min-height: 24px; }
+  .alarm .actions { margin-top: var(--s6); }
+  .snoozes { margin-top: var(--s4); display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1); }
+  .snoozes .ghost b { font-family: var(--mono); font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 class="brand">BrainReminder</h1>
+    <p class="tagline">Take the break. Snoozing costs interest.</p>
+  </header>
+
+  <section class="hero" aria-live="polite">
+    <p class="status" id="status">Not running</p>
+    <p class="clock" id="clock">45:00</p>
+    <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+
+    <div class="actions">
+      <button class="primary" id="startBtn">Start</button>
+      <button class="ghost" id="nowBtn">Break now</button>
+    </div>
+
+    <fieldset class="seg" id="interval">
+      <legend>Remind me every</legend>
+      <label><input type="radio" name="iv" value="1500"><span>25m</span></label>
+      <label><input type="radio" name="iv" value="2700"><span>45m</span></label>
+      <label><input type="radio" name="iv" value="3600"><span>60m</span></label>
+      <label><input type="radio" name="iv" value="10"><span>10s demo</span></label>
+    </fieldset>
+  </section>
+
+  <section class="today">
+    <h2>Today</h2>
+    <p id="todayLine"></p>
+  </section>
+
+  <details class="tune">
+    <summary>Challenges</summary>
+    <p>One per line: <code>amount | unit | verb</code>, e.g. <code>5 | squats | Do</code></p>
+    <textarea id="challenges" spellcheck="false"></textarea>
+    <div class="actions">
+      <button class="ghost" id="saveChallenges">Save challenges</button>
+      <span class="note" id="saveNote" aria-live="polite"></span>
+    </div>
+  </details>
+</main>
+
+<div class="alarm" id="alarm" role="alertdialog" aria-modal="true" aria-labelledby="challenge">
+  <div class="alarm-inner">
+    <p class="kicker">Brain break</p>
+    <h2 class="challenge" id="challenge"></h2>
+    <p class="debt" id="debt"></p>
+    <div class="actions">
+      <button class="primary" id="doneBtn">Done</button>
+    </div>
+    <div class="snoozes">
+      <button class="ghost" id="snooze5"></button>
+      <button class="ghost" id="snooze10"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_CHALLENGES = `5 | squats | Do
+1 | glass of water | Drink
+2 | burpees | Do
+30 | seconds of stretching | Do
+60 | seconds of walking around | Go for
+10 | jumping jacks | Do
+5 | push-ups | Do
+20 | seconds looking out a window | Spend`;
+
+const INTEREST = { 5: 0.25, 10: 0.60 };
+const $ = id => document.getElementById(id);
+
+// ---------- storage (safe) ----------
+function load(key, fallback) {
+  try { const v = localStorage.getItem('br_' + key); return v === null ? fallback : JSON.parse(v); }
+  catch { return fallback; }
+}
+function save(key, value) {
+  try { localStorage.setItem('br_' + key, JSON.stringify(value)); } catch {}
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+let stats = load('stats', null);
+if (!stats || stats.day !== today()) stats = { day: today(), breaks: 0, reps: 0, snoozes: 0, interest: 0 };
+stats.interest = stats.interest || 0;
+
+let state = { running: false, dueAt: null, total: 0, current: null };
+
+// ---------- interval ----------
+const intervalInputs = [...document.querySelectorAll('#interval input')];
+const getInterval = () => +(intervalInputs.find(i => i.checked) || intervalInputs[1]).value;
+const savedIv = String(load('interval', '2700'));
+(intervalInputs.find(i => i.value === savedIv) || intervalInputs[1]).checked = true;
+intervalInputs.forEach(i => i.addEventListener('change', () => {
+  save('interval', i.value);
+  if (state.running && !state.current) schedule(getInterval());
+  render();
+}));
+
+// ---------- challenges ----------
+function parseChallenges(text) {
+  return text.split('\n').map(l => l.split('|').map(s => s.trim()))
+    .filter(p => p.length === 3 && !isNaN(parseFloat(p[0])))
+    .map(([a, unit, verb]) => ({ amount: parseFloat(a), unit, verb }));
+}
+let challengeText = load('challenges', DEFAULT_CHALLENGES);
+$('challenges').value = challengeText;
+$('saveChallenges').onclick = () => {
+  const parsed = parseChallenges($('challenges').value);
+  if (!parsed.length) { $('saveNote').textContent = 'No valid lines found.'; return; }
+  challengeText = $('challenges').value;
+  save('challenges', challengeText);
+  $('saveNote').textContent = `Saved ${parsed.length} challenges.`;
+};
+function pickChallenge() {
+  const list = parseChallenges(challengeText);
+  const c = list[Math.floor(Math.random() * list.length)];
+  return { ...c, base: c.amount, snoozes: 0 };
+}
+const withInterest = (amount, minutes) =>
+  Math.max(Math.ceil(amount * (1 + INTEREST[minutes])), amount + 1);
+
+// ---------- sound ----------
+let audioCtx, beepLoop = null;
+function beep() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    [0, 0.25, 0.5].forEach((d, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'square';
+      o.frequency.value = i === 2 ? 1046 : 784;
+      g.gain.setValueAtTime(0.15, t + d);
+      g.gain.exponentialRampToValueAtTime(0.001, t + d + 0.2);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t + d); o.stop(t + d + 0.2);
+    });
+  } catch {}
+}
+
+// ---------- alarm ----------
+const plain = c => `${c.verb} ${c.amount} ${c.unit}`;
+function esc(s) { return s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
+
+function ring() {
+  if (!state.current) state.current = pickChallenge();
+  const c = state.current;
+  $('challenge').innerHTML = `${esc(c.verb)} <em>${c.amount}</em> ${esc(c.unit)}`;
+  $('debt').textContent = c.snoozes
+    ? `${c.snoozes} snooze${c.snoozes > 1 ? 's' : ''} so far. You started at ${c.base}.`
+    : 'Pay now and it stays this cheap.';
+  $('snooze5').innerHTML  = `Snooze 5 min → <b>${withInterest(c.amount, 5)}</b> ${esc(c.unit)}`;
+  $('snooze10').innerHTML = `Snooze 10 min → <b>${withInterest(c.amount, 10)}</b> ${esc(c.unit)}`;
+  $('alarm').classList.add('show');
+  $('doneBtn').focus();
+  document.title = '⏰ ' + plain(c);
+  beep();
+  clearInterval(beepLoop);
+  beepLoop = setInterval(beep, 4000);
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('Brain break', { body: plain(c) }); } catch {}
+  }
+}
+function closeAlarm() {
+  $('alarm').classList.remove('show');
+  clearInterval(beepLoop);
+  document.title = 'BrainReminder';
+}
+function schedule(seconds) {
+  state.total = seconds * 1000;
+  state.dueAt = Date.now() + state.total;
+  state.running = true;
+  $('startBtn').textContent = 'Pause';
+}
+function snooze(minutes) {
+  const c = state.current;
+  const next = withInterest(c.amount, minutes);
+  stats.interest += next - c.amount;
+  c.amount = next;
+  c.snoozes++;
+  stats.snoozes++; save('stats', stats);
+  closeAlarm();
+  const demo = getInterval() === 10;          // demo mode: minutes become seconds
+  schedule(demo ? minutes : minutes * 60);
+  $('status').textContent = `Snoozed. ${plain(c)} in`;
+  render();
+}
+$('snooze5').onclick = () => snooze(5);
+$('snooze10').onclick = () => snooze(10);
+$('doneBtn').onclick = () => {
+  stats.breaks++;
+  stats.reps += state.current.amount;
+  save('stats', stats);
+  state.current = null;
+  closeAlarm();
+  if (state.running) { schedule(getInterval()); $('status').textContent = 'Paid. Next break in'; }
+  render();
+};
+$('startBtn').onclick = () => {
+  if (state.running) {
+    state.running = false; state.dueAt = null;
+    $('startBtn').textContent = 'Start';
+    $('status').textContent = 'Paused';
+  } else {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch {}
+    schedule(getInterval());
+    $('status').textContent = 'Next break in';
+  }
+  render();
+};
+$('nowBtn').onclick = () => { state.dueAt = null; ring(); };
+
+// ---------- render ----------
+function fmt(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+function render() {
+  const left = state.dueAt ? state.dueAt - Date.now() : getInterval() * 1000;
+  $('clock').textContent = fmt(left);
+  const done = state.dueAt && state.total ? 1 - left / state.total : 0;
+  $('bar').style.transform = `scaleX(${Math.min(1, Math.max(0, done))})`;
+  const n = (v, one, many) => `<b>${v}</b> ${v === 1 ? one : many}`;
+  $('todayLine').innerHTML = stats.breaks || stats.snoozes
+    ? `${n(stats.breaks, 'break', 'breaks')} taken, ${n(stats.reps, 'rep', 'reps')} done.` +
+      (stats.snoozes ? ` ${n(stats.snoozes, 'snooze', 'snoozes')} cost you <b class="owed">+${stats.interest}</b> extra.` : ' No snoozes. Clean record.')
+    : 'No breaks yet. Start the timer and let it nag you.';
+}
+setInterval(() => {
+  if (state.dueAt && Date.now() >= state.dueAt) { state.dueAt = null; ring(); }
+  render();
+}, 250);
+render();
+</script>
+</body>
+</html>
