@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🏁 FinishLine · project follow-up consultant</title>
+<style>
+  :root{
+    --bg:#0e1318; --panel:#151c24; --panel2:#1b2430; --line:#263241;
+    --text:#e6edf3; --muted:#8b9bb0; --amber:#ffb547; --green:#4ade80;
+    --blue:#7cc4ff; --red:#ff7a7a; --violet:#c4a5ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .app{display:grid;grid-template-columns:250px 1fr 380px;height:100vh}
+  @media (max-width:1100px){.app{grid-template-columns:1fr;height:auto}.side{border-right:none}}
+  aside,main,section{min-height:0}
+  /* sidebar */
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:12px}
+  .brand{font-weight:800;font-size:20px;letter-spacing:.2px}
+  .brand small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+  .proj{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:.15s}
+  .proj:hover{border-color:#3a4a5e}
+  .proj.active{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
+  .proj b{display:block}
+  .proj .note{font-size:12px;color:var(--muted)}
+  .bar{height:5px;background:#0b1015;border-radius:9px;margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--green));border-radius:9px;transition:width .3s}
+  .side .hint{font-size:12px;color:var(--muted);margin-top:auto;border-top:1px solid var(--line);padding-top:10px}
+  button{font:inherit;color:inherit;cursor:pointer}
+  .ghost{background:transparent;border:1px dashed #3a4a5e;border-radius:10px;padding:8px;color:var(--muted)}
+  .ghost:hover{color:var(--text);border-color:var(--muted)}
+  /* chat */
+  main{display:flex;flex-direction:column;height:100vh}
+  @media (max-width:1100px){main{height:80vh}}
+  .chathead{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .chathead h2{margin:0;font-size:17px}
+  .chathead a{color:var(--blue);font-size:13px;text-decoration:none}
+  .chathead .sp{flex:1}
+  .chathead button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13px;color:var(--muted)}
+  .chathead button:hover{color:var(--text)}
+  .log{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:78%;padding:10px 14px;border-radius:14px;white-space:normal;animation:pop .2s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  .bot{background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:4px;align-self:flex-start}
+  .bot::before{content:"🧑‍💼 Consultant";display:block;font-size:11px;color:var(--amber);font-weight:700;margin-bottom:2px}
+  .you{background:#24405e;border-bottom-right-radius:4px;align-self:flex-end}
+  .typing{color:var(--muted);font-size:13px;padding-left:4px}
+  .quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 10px}
+  .quick button{background:transparent;border:1px solid var(--amber);color:var(--amber);border-radius:999px;padding:6px 14px;font-size:14px}
+  .quick button:hover{background:var(--amber);color:#1a1205}
+  .composer{display:flex;gap:10px;padding:12px 20px 18px;border-top:1px solid var(--line)}
+  textarea{flex:1;resize:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:10px 12px;font:inherit;min-height:46px;max-height:180px}
+  textarea:focus{outline:none;border-color:var(--amber)}
+  .send{background:var(--amber);border:none;color:#1a1205;font-weight:700;border-radius:12px;padding:0 18px}
+  .send:disabled{opacity:.4;cursor:default}
+  /* plan */
+  .plan{background:var(--panel);border-left:1px solid var(--line);padding:18px;overflow:auto;height:100vh}
+  @media (max-width:1100px){.plan{height:auto;border-left:none;border-top:1px solid var(--line)}}
+  .plan h3{margin:0 0 4px;font-size:16px}
+  .plan .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .box{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+  .box .k{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:3px}
+  .meter{height:10px;background:#0b1015;border-radius:9px;overflow:hidden;margin:6px 0 2px}
+  .meter i{display:block;height:100%;border-radius:9px;transition:width .3s}
+  .warn{color:var(--red);font-size:13px;margin-top:6px}
+  .card{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 11px;margin-bottom:8px;cursor:pointer;transition:.15s}
+  .card:hover{border-color:#3a4a5e}
+  .card .slot{min-width:52px;font-size:12px;font-weight:700;color:var(--amber);padding-top:2px}
+  .card .t{flex:1;font-size:14px}
+  .card.spike .t{color:var(--violet)}
+  .card.later{opacity:.75}.card.later .slot{color:var(--muted)}
+  .card.cut{opacity:.4}.card.cut .t{text-decoration:line-through}
+  .badges{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}
+  .bd{font-size:11px;border-radius:999px;padding:1px 8px;border:1px solid}
+  .i3{color:var(--green);border-color:var(--green)}.i2{color:var(--blue);border-color:var(--blue)}.i1{color:var(--muted);border-color:var(--muted)}
+  .ef{color:var(--text);border-color:#3a4a5e}
+  .grp{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:14px 0 6px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .actions button{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
+  .actions button.primary{background:var(--green);border-color:var(--green);color:#06210f;font-weight:700}
+  .actions button:hover{filter:brightness(1.15)}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:30px 10px;border:1px dashed var(--line);border-radius:12px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green);color:#06210f;font-weight:700;padding:8px 16px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">🏁 FinishLine<small>a consultant for half-done projects</small></div>
+    <div id="projects" style="display:flex;flex-direction:column;gap:8px"></div>
+    <button class="ghost" id="addProj">＋ Add a project</button>
+    <div class="hint">The consultant can't read your repos. You tell it what's in them; it asks the hard questions, ranks your changes and fits them into the time you actually have.</div>
+  </aside>
+
+  <main>
+    <div class="chathead">
+      <h2 id="pname"></h2><a id="plink" target="_blank" rel="noopener"></a>
+      <span class="sp"></span>
+      <button id="restart" title="Start this project's talk over">↺ Restart</button>
+    </div>
+    <div class="log" id="log"></div>
+    <div class="quick" id="quick"></div>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Type your answer… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <button class="send" id="send">Send</button>
+    </div>
+  </main>
+
+  <section class="plan" id="plan"></section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORE = 'finishline.v1';
+const STEPS = ['snapshot','done','changes','rate','risk','sessions','plan'];
+const IMPACT = {3:'Essential',2:'Nice',1:'Polish'};
+const EFFORT = {1:'S · 1',2:'M · 2',4:'L · 4'};
+const TODAY = '2026-11-25';
+
+function mk(id,name,url,note){
+  return {id,name,url,note,step:'snapshot',ri:0,rsub:'impact',pushed:{},
+    a:{snapshot:'',done:'',changes:[],risk:'',sessions:0},log:[]};
+}
+function seed(){
+  return {active:'reciperemix',projects:[
+    mk('reciperemix','recipeRemix','https://github.com/EliasOzol/recipeRemix','Changes queued · start here'),
+    mk('passrotor','Passrotor','https://github.com/EliasOzol/Passrotor','Follow-up'),
+  ]};
+}
+let db; try{ db = JSON.parse(localStorage.getItem(STORE)) }catch(e){}
+if(!db || !db.projects) db = seed();
+const save = () => localStorage.setItem(STORE, JSON.stringify(db));
+const P = () => db.projects.find(p => p.id === db.active) || db.projects[0];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\*(.+?)\*/g,'<i>$1</i>').replace(/\n/g,'<br>');
+const words = s => s.trim().split(/\s+/).filter(Boolean).length;
+
+/* ---------- the consultant's script ---------- */
+function question(p){
+  const n = p.a.changes.length, c = p.a.changes[p.ri];
+  switch(p.step){
+    case 'snapshot': return `Hi! Let's get **${p.name}** over the finish line.\nFirst, no changes yet: in a sentence or two, what does it do *today*?`;
+    case 'done': return `Now picture it **finished**. Who opens it, and what can they do that they can't do today? Be concrete.`;
+    case 'changes': return `Now the changes you already have in mind. Write **one per line**, rough is fine.`;
+    case 'rate': return p.rsub === 'impact'
+      ? `**${p.ri+1}/${n}** · “${c.text}”\nHow much does this matter for *finished*?`
+      : `And how big is “${c.text}”? (sessions ≈ focused 2–3 hour blocks)`;
+    case 'risk': return `Which part are you least sure how to build? I'll put a small **spike** (an experiment) first, so a surprise can't sink the plan late. Say "none" if nothing scares you.`;
+    case 'sessions': return `Last one: how many focused work sessions will you give ${p.name} before you call it done?`;
+  }
+  return '';
+}
+function quick(p){
+  if(p.step === 'rate') return p.rsub === 'impact' ? ['Essential','Nice to have','Polish'] : ['Small · 1 session','Medium · 2','Large · 4+'];
+  if(p.step === 'risk') return ['none'];
+  if(p.step === 'sessions') return ['2','4','6','10'];
+  if(p.step === 'plan') return ['Why this order?','add: '];
+  return [];
+}
+const bot = (p,t) => p.log.push({who:'bot',text:t});
+const ask = p => { const q = question(p); if(q) bot(p,q); };
+
+function handle(p, input){
+  const t = input.trim(), lo = t.toLowerCase();
+  switch(p.step){
+    case 'snapshot':
+      if(words(t) < 3){ bot(p,'Give me a few more words than that 🙂'); return; }
+      p.a.snapshot = t; p.step = 'done';
+      bot(p, 'Got it. Good to have a baseline, so we know what we\'re *not* rebuilding.'); ask(p); return;
+
+    case 'done':
+      if(words(t) < 8 && !p.pushed.done){
+        p.pushed.done = true;
+        bot(p,'That\'s a bit thin to steer by. Try this shape:\n*“A [who] can [do what] without [today\'s pain].”*\nOr send it again as-is and we\'ll move on.'); return;
+      }
+      p.a.done = t; p.step = 'changes';
+      bot(p,'That\'s our **definition of done**. Every change has to earn its place against it.'); ask(p); return;
+
+    case 'changes': {
+      const items = t.split(/\n/).map(s => s.replace(/^\s*([-*•]|\d+[.)])\s*/,'').trim()).filter(Boolean);
+      if(!items.length){ ask(p); return; }
+      p.a.changes = items.map(text => ({text,impact:0,effort:0,cut:false}));
+      p.step = 'rate'; p.ri = 0; p.rsub = 'impact';
+      bot(p, items.length > 7
+        ? `${items.length} changes. That's a lot, so we'll rank them hard. Quick ratings, one at a time.`
+        : items.length === 1 ? 'Just one? Focused. Let\'s size it.' : `${items.length} changes, nice and clear. Quick ratings, one at a time.`);
+      ask(p); return;
+    }
+
+    case 'rate': {
+      const c = p.a.changes[p.ri];
+      if(p.rsub === 'impact'){
+        const v = /^(ess|must|3)/.test(lo) ? 3 : /^(nice|2)/.test(lo) ? 2 : /^(pol|1)/.test(lo) ? 1 : 0;
+        if(!v){ bot(p,'Pick one: Essential, Nice to have or Polish.'); return; }
+        c.impact = v; p.rsub = 'effort'; ask(p); return;
+      }
+      const e = /^(s|small|1)/.test(lo) ? 1 : /^(m|medium|2)/.test(lo) ? 2 : /^(l|large|4|3)/.test(lo) ? 4 : 0;
+      if(!e){ bot(p,'Small, Medium or Large?'); return; }
+      c.effort = e;
+      if(c.impact === 3 && e === 4) bot(p,'Big *and* essential. Worth splitting into smaller steps when you start; I\'ll flag it in the brief.');
+      else if(c.impact === 1 && e === 4) bot(p,'Large, and only polish. I\'ll park that one unless there\'s room.');
+      else if(c.impact === 3 && e === 1) bot(p,'Essential and small: that\'s a quick win. It goes near the top.');
+      p.ri++; p.rsub = 'impact';
+      if(p.ri >= p.a.changes.length){ p.step = 'risk'; bot(p,'All rated. 👍'); }
+      ask(p); return;
+    }
+
+    case 'risk':
+      p.a.risk = /^(none|no|nothing|-)$/.test(lo) ? '' : t;
+      p.step = 'sessions'; if(p.a.risk) bot(p,'Noted. We\'ll poke at that first.'); ask(p); return;
+
+    case 'sessions': {
+      const n = parseInt(t,10);
+      if(!(n > 0 && n < 200)){ bot(p,'Just a number, e.g. 4.'); return; }
+      p.a.sessions = n; p.step = 'plan'; bot(p, summary(p)); return;
+    }
+
+    case 'plan':
+      if(lo.startsWith('add:') && t.slice(4).trim()){
+        p.a.changes.push({text:t.slice(4).trim(),impact:2,effort:2,cut:false});
+        bot(p,`Added “${t.slice(4).trim()}” as Nice / Medium. Restart if you want to rate it properly.`); return;
+      }
+      if(lo.startsWith('why')){
+        bot(p,'Order rule: risky spike first, then **Essential** before Nice before Polish, and within each, the **smallest first**. Small wins early keep momentum, and essentials are protected even when time runs short. Nice/Polish items only get in if they fit the budget.'); return;
+      }
+      bot(p,'The plan is on the right. Click a card to cut or restore it, type *add: something* to add a change, or hit **Copy Claude brief** and take it to the repo.'); return;
+  }
+}
+
+/* ---------- planning ---------- */
+function plan(p){
+  const a = p.a, budget = a.sessions;
+  const rated = a.changes.map((c,i) => ({...c,i})).filter(c => c.impact && c.effort);
+  const order = rated.sort((x,y) => y.impact - x.impact || x.effort - y.effort || x.i - y.i);
+  const sched = [], later = [], cut = [];
+  let used = 0;
+  const slot = cost => { const s = used + 1, e = used + cost; used = e; return s === e ? `S${s}` : `S${s}–${e}`; };
+  if(a.risk) sched.push({text:'Spike: ' + a.risk, spike:true, slot:slot(1)});
+  for(const c of order){
+    if(c.cut){ cut.push(c); continue; }
+    if(!budget || c.impact === 3 || used + c.effort <= budget) sched.push({...c, slot: budget ? slot(c.effort) : '#'+(sched.length+1)});
+    else later.push(c);
+  }
+  return {sched, later, cut, used, budget, over: budget && used > budget};
+}
+function summary(p){
+  const pl = plan(p), ess = p.a.changes.filter(c => c.impact === 3).length;
+  const first = pl.sched.find(s => !s.spike);
+  let m = `Here's my read on **${p.name}**:\n• ${p.a.changes.length} changes, ${ess} essential\n• The plan uses **${pl.used} of ${pl.budget}** sessions`;
+  if(first) m += `\n• Start with “${first.text}”`;
+  if(pl.over){
+    const big = pl.sched.filter(s => s.impact === 3).sort((a,b) => b.effort - a.effort)[0];
+    m += `\n\n⚠️ Your essentials alone don't fit. Either give it ${pl.used} sessions, or shrink scope${big ? `: split “${big.text}” into a smaller first version` : ''}.`;
+  }
+  if(pl.later.length) m += `\n\nI parked ${pl.later.length} for later: ${pl.later.map(c => '“'+c.text+'”').join(', ')}. That's not failure, that's v2.`;
+  m += `\n\nClick any card to cut or restore it; the plan updates live. When you're happy, hit **Copy Claude brief** and paste it in the repo.`;
+  return m;
+}
+
+/* ---------- exports ---------- */
+function planMd(p){
+  const pl = plan(p), L = [];
+  L.push(`# ${p.name}: finish plan (${TODAY})`, '', `Repo: ${p.url || '-'}`, '');
+  L.push('## Today', p.a.snapshot || '-', '', '## Definition of done', p.a.done || '-', '');
+  L.push(`## Plan (${pl.used}/${pl.budget || '?'} sessions)`);
+  pl.sched.forEach(s => L.push(`- [ ] **${s.slot}** · ${s.text}${s.spike ? ' _(spike)_' : ` _(${IMPACT[s.impact]}, ${EFFORT[s.effort]})_`}`));
+  if(pl.later.length){ L.push('', '## Later (v2)'); pl.later.forEach(c => L.push(`- ${c.text}`)); }
+  if(pl.cut.length){ L.push('', '## Cut'); pl.cut.forEach(c => L.push(`- ~~${c.text}~~`)); }
+  return L.join('\n');
+}
+function briefMd(p){
+  const pl = plan(p), items = pl.sched.filter(s => !s.spike);
+  const L = [`I'm finishing my project **${p.name}**${p.url ? ` (${p.url})` : ''}.`, ''];
+  L.push(`What it does today: ${p.a.snapshot}`, '', `"Finished" means: ${p.a.done}`, '');
+  if(p.a.risk) L.push(`The part I'm least sure about: ${p.a.risk}. Before anything else, help me do a small spike to find out if/how that works.`, '');
+  L.push('Then these changes, in this order:');
+  items.forEach((c,i) => L.push(`${i+1}. ${c.text}${c.impact === 3 && c.effort === 4 ? ' (big: propose how to split it first)' : ''}`));
+  if(pl.later.length) L.push('', `Out of scope for now (don't do these): ${pl.later.map(c => c.text).join('; ')}.`);
+  L.push('', 'First read the repo and tell me where each change would go, and flag anything in this plan that doesn\'t match the code. Then do one change at a time and stop after each so I can test it.');
+  return L.join('\n');
+}
+function copy(text, label){
+  const done = () => toast(label + ' copied');
+  if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  function fallback(){ const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+}
+function download(p){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([planMd(p)], {type:'text/markdown'}));
+  a.download = `${p.name}-finish-plan.md`; a.click();
+}
+function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1600); }
+
+/* ---------- rendering ---------- */
+let busy = false;
+function render(){
+  const p = P();
+  $('projects').innerHTML = db.projects.map(q => {
+    const pct = Math.round(STEPS.indexOf(q.step) / (STEPS.length - 1) * 100);
+    return `<div class="proj ${q.id === p.id ? 'active' : ''}" data-id="${q.id}"><b>${esc(q.name)}</b><span class="note">${esc(q.step === 'plan' ? 'Plan ready ✓' : q.note || '')}</span><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }).join('');
+  $('pname').textContent = p.name;
+  $('plink').textContent = p.url ? p.url.replace('https://','') + ' ↗' : '';
+  $('plink').href = p.url || '#';
+  $('log').innerHTML = p.log.map(m => `<div class="msg ${m.who}">${md(m.text)}</div>`).join('') + (busy ? '<div class="typing">Consultant is thinking…</div>' : '');
+  $('log').scrollTop = 1e9;
+  $('quick').innerHTML = busy ? '' : quick(p).map(q => `<button>${esc(q)}</button>`).join('');
+  $('send').disabled = busy;
+  $('input').placeholder = p.step === 'changes' ? 'One change per line… (Shift+Enter for a new line, Enter to send)' : 'Type your answer… (Enter to send, Shift+Enter for a new line)';
+  renderPlan(p);
+}
+function card(c, cls){
+  const badges = c.spike ? '<span class="bd i2" style="color:var(--violet);border-color:var(--violet)">spike · 1</span>'
+    : `<span class="bd i${c.impact}">${IMPACT[c.impact]}</span><span class="bd ef">${EFFORT[c.effort]}</span>`;
+  return `<div class="card ${cls} ${c.spike ? 'spike' : ''}" ${c.spike ? '' : `data-i="${c.i}"`} title="${c.spike ? '' : 'Click to cut / restore'}">
+    <div class="slot">${c.slot || (cls === 'later' ? 'later' : 'cut')}</div>
+    <div class="t">${esc(c.text)}<div class="badges">${badges}</div></div></div>`;
+}
+function renderPlan(p){
+  const pl = plan(p), a = p.a;
+  let h = `<h3>📋 Finish plan · ${esc(p.name)}</h3><div class="sub">Builds up live as you talk. Click a card to cut / restore it.</div>`;
+  if(a.done) h += `<div class="box"><div class="k">Definition of done</div>${esc(a.done)}</div>`;
+  if(pl.budget){
+    const pct = Math.min(100, pl.used / pl.budget * 100);
+    h += `<div class="box"><div class="k">Time budget</div><b>${pl.used}</b> of <b>${pl.budget}</b> sessions
+      <div class="meter"><i style="width:${pct}%;background:${pl.over ? 'var(--red)' : 'var(--green)'}"></i></div>
+      ${pl.over ? `<div class="warn">Essentials exceed your budget by ${pl.used - pl.budget}. Cut or split something.</div>` : ''}</div>`;
+  }
+  if(!pl.sched.length && !pl.later.length && !pl.cut.length){
+    const pending = a.changes.length ? `${a.changes.length} changes waiting for ratings…` : 'No changes yet. Answer the consultant on the left and your plan appears here.';
+    h += `<div class="empty">${pending}</div>`;
+  } else {
+    h += `<div class="grp">Plan</div>` + pl.sched.map(c => card(c,'')).join('');
+    if(pl.later.length) h += `<div class="grp">Later · v2</div>` + pl.later.map(c => card(c,'later')).join('');
+    if(pl.cut.length) h += `<div class="grp">Cut</div>` + pl.cut.map(c => card(c,'cut')).join('');
+  }
+  if(p.step === 'plan') h += `<div class="actions">
+      <button class="primary" data-act="brief">🤖 Copy Claude brief</button>
+      <button data-act="plan">📋 Copy plan</button>
+      <button data-act="dl">⬇ .md</button></div>`;
+  $('plan').innerHTML = h;
+}
+
+/* ---------- events ---------- */
+function send(text){
+  const p = P(); if(busy || !text.trim()) return;
+  p.log.push({who:'you',text:text.trim()}); busy = true; render();
+  setTimeout(() => { handle(p, text); busy = false; save(); render(); $('input').focus(); }, 380 + Math.random()*300);
+}
+$('send').onclick = () => { send($('input').value); $('input').value = ''; };
+$('input').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); $('send').click(); }
+});
+$('input').addEventListener('input', e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; });
+$('quick').onclick = e => {
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.textContent === 'add: '){ $('input').value = 'add: '; $('input').focus(); return; }
+  send(b.textContent);
+};
+$('projects').onclick = e => {
+  const el = e.target.closest('.proj'); if(!el) return;
+  db.active = el.dataset.id; const p = P(); if(!p.log.length) ask(p); save(); render();
+};
+$('addProj').onclick = () => {
+  const name = prompt('Project name?'); if(!name) return;
+  const url = prompt('Repo URL (optional)?', 'https://github.com/') || '';
+  const p = mk('p' + Date.now(), name.trim(), url.trim() === 'https://github.com/' ? '' : url.trim(), 'Follow-up');
+  db.projects.push(p); db.active = p.id; ask(p); save(); render();
+};
+$('restart').onclick = () => {
+  const p = P(); if(!confirm(`Start the talk about ${p.name} over?`)) return;
+  Object.assign(p, mk(p.id, p.name, p.url, p.note)); ask(p); save(); render();
+};
+$('plan').onclick = e => {
+  const p = P(), act = e.target.closest('[data-act]');
+  if(act){ const k = act.dataset.act;
+    if(k === 'brief') copy(briefMd(p), 'Claude brief'); else if(k === 'plan') copy(planMd(p), 'Plan'); else download(p); return; }
+  const c = e.target.closest('.card[data-i]'); if(!c) return;
+  const ch = p.a.changes[+c.dataset.i]; ch.cut = !ch.cut; save(); render();
+};
+
+if(!P().log.length) ask(P());
+save(); render(); $('input').focus();
+</script>
+</body>
+</html>
