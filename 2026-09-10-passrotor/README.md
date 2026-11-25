@@ -1,6 +1,6 @@
 # 🔐⚙️ Passrotor
 
-> One master password, a different password for every site, and each one changes after you log in, like an Enigma rotor.
+> One master password, a different password for every site, and each one changes when you rotate it, like an Enigma rotor.
 
 **Daily idea · 2026-09-10**
 
@@ -8,7 +8,7 @@ Code: <https://github.com/EliasOzol/Passrotor>
 
 ## The idea
 
-Passrotor is a planned browser extension for **deterministic, per-site passwords that change over time**.
+Passrotor is a browser extension for **deterministic, per-site passwords that change over time**.
 
 You always type the same master password. The extension works out the real password for each site from it:
 
@@ -16,11 +16,11 @@ You always type the same master password. The extension works out the real passw
 derived_password = KDF(master_password, site_domain, rotation_counter)
 ```
 
-Tools like LessPass and SuperGenPass already do `(master password, domain) → password`, but each site keeps the same password forever. Passrotor adds a small **rotation counter** per site. It moves forward after each successful login, so the site's password changes while your master password stays the same.
+Tools like LessPass and SuperGenPass already do `(master password, domain) → password`, but each site keeps the same password forever. Passrotor adds a small **rotation counter** per site. When it moves forward, the site's password changes while your master password stays the same.
 
-Nothing secret is stored. Only `{domain: counter}` pairs are saved, and the master password stays in memory only while a password is being derived.
+Nothing secret is stored. Only `{domain: counter}` pairs are saved, and the master password stays in memory only while the popup is open.
 
-The catch: unlike TOTP, the website has no rotor of its own. Before the counter can move forward, the extension has to go through the site's own change-password form and set the new password there.
+The catch: unlike TOTP, the website has no rotor of its own. Before the counter can move forward, the new password has to be set through the site's own change-password form.
 
 ## Why
 
@@ -31,41 +31,42 @@ The catch: unlike TOTP, the website has no rotor of its own. Before the counter 
 
 ## The prototype
 
-So far the repository has the core logic as plain Node/Web Crypto modules, all in the repo root. There's no extension code yet:
+The repository root is an unpacked Manifest V3 extension (Chrome/Edge):
 
-- [`kdf.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.js): derives the key with PBKDF2-SHA256 (250,000 iterations, salt `domain:counter`). `normalizeDomain` strips the protocol, `www.`, the path and uppercase letters. `formatAsPassword` turns the key into a 20-character password that always has a lowercase letter, an uppercase letter, a digit and a symbol.
-- [`rotation-store.js`](https://github.com/EliasOzol/Passrotor/blob/main/rotation-store.js): an in-memory `RotationStore` with `get`, `increment` and JSON save/load for the per-site counters. The plan is to move it to `chrome.storage.sync` later.
-- [`kdf.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.test.js): plain-assert tests for determinism, rotation, per-site output, domain normalization and the password policy.
-
-The README sketches the planned extension layout (Manifest V3, a content script that fills password fields, a login detector, a popup), but none of that is built yet.
+- [`manifest.json`](https://github.com/EliasOzol/Passrotor/blob/main/manifest.json): permissions `activeTab`, `scripting` and `storage`, no background script.
+- [`popup.html`](https://github.com/EliasOzol/Passrotor/blob/main/popup.html) / [`popup.js`](https://github.com/EliasOzol/Passrotor/blob/main/popup.js): picks up the site from the open tab, takes the master password, and offers **Fill login** (fills visible password fields, only if the site matches the tab), **Copy** and **Show**.
+- **Two-step rotation:** *Rotate this site's password…* → *Fill change form* on the site's change-password page (current password → current field, next password → "new"/"confirm" fields) → submit → reopen and click *It worked*. Only then does the counter move forward; *Cancel* drops it. The rotation in progress survives the popup closing.
+- **− / +** buttons step the counter by hand to fix drift.
+- [`kdf.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.js): PBKDF2-SHA256 (250,000 iterations, salt `domain:counter`), domain normalization and a 20-character password with lowercase, uppercase, digit and symbol.
+- [`rotation-store.js`](https://github.com/EliasOzol/Passrotor/blob/main/rotation-store.js): per-site counters, now using the same domain normalization as `kdf.js`. The popup saves them to `chrome.storage.sync`.
+- Tests: [`kdf.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.test.js) and [`rotation-store.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/rotation-store.test.js), run with `npm test`.
 
 ### Run it
-
-You need Node 19 or newer (for the global `crypto.subtle`). To derive a password straight from a clone:
 
 ```powershell
 git clone https://github.com/EliasOzol/Passrotor.git
 cd Passrotor
-node -e "const { derivePassword } = require('./kdf.js'); derivePassword('my master password', 'https://www.example.com/login', 0).then(console.log)"
+npm test                      # Node 19+
+start chrome chrome://extensions
 ```
 
-Change the last argument (`0` → `1`) to see the password rotate.
-
-The tests (`node kdf.test.js`) **fail as committed**: they `require("../extension/background/kdf.js")`, which doesn't exist in the repository. See Next steps.
+Turn on **Developer mode**, click **Load unpacked**, pick the `Passrotor` folder, then open any website and click the Passrotor icon.
 
 ## Status
 
-🔴 **Idea.** There's only a small derivation library with no extension around it, and its test suite can't run because the import path is wrong.
+🟡 **Prototype.** The extension derives, fills, copies and rotates passwords with a manual confirm step, but rotation isn't automatic yet and it hasn't been tested against real sites.
 
 ## Next steps
 
-- [ ] **Fix the README:** it still has merge-conflict markers (`<<<<<<< HEAD` / `=======` / `>>>>>>>`). Keep the full RotoPass write-up, rename it to Passrotor and delete the markers.
-- [ ] **Fix the test import:** `kdf.test.js` requires `../extension/background/kdf.js`. Change it to `./kdf.js`, or move the files into the planned `extension/` and `tests/` layout.
-- [ ] Add a `package.json` with an `npm test` script
-- [ ] Normalize domains in `RotationStore` too, so `www.example.com` and `example.com` share one counter like they do in `kdf.js`
-- [ ] Hand-test the riskiest part first: can a site's change-password flow be automated (2FA, CAPTCHAs, re-entering the current password)?
-- [ ] Prototype login-success detection on its own
-- [ ] Build the Manifest V3 extension: popup, content script that fills fields, background derivation
-- [ ] Sync counters across devices (`chrome.storage.sync`) and add drift recovery (try counters N-2 … N+2)
-- [ ] Never move the counter forward until the site confirms the password change, so a failed change can't lock you out
-- [ ] Per-site password policies (maximum length, allowed symbols). Today the formatter only uses 32 key bytes, so passwords longer than 32 characters repeat bytes.
+- [x] Fix the README merge-conflict markers
+- [x] Fix the test import and add `npm test`
+- [x] Normalize domains in `RotationStore` too
+- [x] Build the Manifest V3 extension: popup, fill, copy
+- [x] Sync counters with `chrome.storage.sync` and never move the counter forward until you confirm the change worked
+- [ ] Hand-test *Fill change form* on 2–3 real sites (2FA, CAPTCHAs, unusual field names)
+- [ ] Login-success detection, so rotation can be offered or done automatically after a login
+- [ ] Automatic drift recovery (try counters N-2 … N+2) instead of only the −/+ buttons
+- [ ] Define what a "site" is: subdomains (`login.example.com` ≠ `example.com` today), `.co.uk`-style TLDs, site migrations
+- [ ] Per-site password policies (maximum length, allowed symbols). The formatter only uses 32 key bytes, so passwords longer than 32 characters repeat bytes.
+- [ ] Consider Argon2 instead of PBKDF2, and a Firefox build
+- [ ] An icon
