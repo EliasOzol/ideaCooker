@@ -1,4 +1,4 @@
-# 🍳🔀 RecipeRemix
+# RecipeRemix
 
 > "I only have 300 g of chicken, not 500 g." Import the recipe, scale it to what you actually have, and keep your own version.
 
@@ -51,7 +51,7 @@ URL import needs internet access and depends on the third-party proxies being up
 
 ## Next steps
 
-- [ ] **Fix:** the library is stored in `window.__rmxLib`, not `localStorage` (as the repo README says), so forks are lost on reload
+- [ ] **Fix:** the library is stored in `window.__rmxLib`, not `localStorage`, so forks are lost on reload
 - [ ] **Fix:** `½`/`¼`/`¾` are replaced with a leading space, so the `^` regex doesn't match and `½ tsk salt` becomes "1 stk  0.5 tsk salt"
 - [ ] **Fix:** the 4 lint errors, and remove the Vite template's `index.css` (dark background, `body` flex centering) that `main.jsx` still imports
 - [ ] Don't scale "to taste" items such as `salt og peber`, which default to 1 stk and get multiplied
