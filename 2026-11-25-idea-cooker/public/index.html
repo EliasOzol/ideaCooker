@@ -6,203 +6,263 @@
 <title>Idea Cooker</title>
 <style>
   :root {
-    --bg: #f7f6f3;
-    --surface: #ffffff;
-    --ink: #1c1b19;
-    --ink-2: #5f5b55;
-    --ink-3: #8f8a82;
-    --line: #e6e3dd;
-    --line-strong: #d3cec5;
-    --accent: #b6461f;
-    --accent-hover: #9d3b18;
-    --accent-soft: #f6e7e0;
-    --red: #d1473d;
-    --amber: #d6951c;
-    --green: #2f8f57;
+    --bg: #f7f6f3; --surface: #ffffff; --sunk: #efede8;
+    --ink: #1c1b19; --ink-2: #5f5b55; --ink-3: #8f8a82;
+    --line: #e6e3dd; --line-strong: #d3cec5;
+    --accent: #b6461f; --accent-hover: #9d3b18; --accent-soft: #f6e7e0;
+    --red: #d1473d; --amber: #d6951c; --green: #2f8f57;
     --focus: color-mix(in srgb, var(--accent) 40%, transparent);
     --radius: 8px;
     --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
     --mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+    --sidebar: 264px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #141312; --surface: #1c1b19; --ink: #ecebe8; --ink-2: #aaa59d; --ink-3: #7a756e;
+      --bg: #141312; --surface: #1c1b19; --sunk: #191816; --ink: #ecebe8; --ink-2: #aaa59d; --ink-3: #7a756e;
       --line: #2b2926; --line-strong: #3a3733; --accent: #e0703f; --accent-hover: #ea8457; --accent-soft: #33221a;
       color-scheme: dark;
     }
   }
-
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
-  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 96px; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
   button, input, textarea, select { font: inherit; color: inherit; }
-  a { color: inherit; text-decoration-color: var(--line-strong); text-underline-offset: 3px; transition: text-decoration-color .15s; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
   a:hover { text-decoration-color: currentColor; }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
   .hidden { display: none !important; }
   .muted { color: var(--ink-2); }
-  .small { font-size: 14px; line-height: 20px; }
-  .tiny { font-size: 13px; line-height: 16px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-  /* top bar */
-  .bar { display: flex; align-items: center; gap: 16px; height: 40px; margin-bottom: 48px; }
-  .brand { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
-  .repo { margin-left: auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .repo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); height: 100vh; height: 100dvh; }
+  .app.with-panel { grid-template-columns: var(--sidebar) minmax(360px, 1fr) minmax(0, 1.15fr); }
 
   /* buttons */
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: 15px; font-weight: 500; transition: background-color .15s, border-color .15s, transform .08s, opacity .15s; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap; transition: background-color .15s, border-color .15s, transform .08s, opacity .15s; }
   .btn:hover { border-color: var(--ink-3); }
   .btn:active { transform: translateY(1px); }
   .btn:disabled { opacity: .45; cursor: default; transform: none; }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-  .btn.ghost { border-color: transparent; background: transparent; height: 32px; padding: 0 8px; color: var(--ink-2); }
-  .btn.ghost:hover { color: var(--ink); background: var(--line); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+  .btn.ghost:hover { color: var(--ink); background: var(--sunk); }
+  .icon-btn { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); cursor: pointer; display: inline-grid; place-items: center; transition: background-color .15s, color .15s; }
+  .icon-btn:hover { background: var(--sunk); color: var(--ink); }
+  .icon-btn svg { width: 16px; height: 16px; }
 
-  /* composer */
-  .today h1 { font-family: var(--display); font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
-  .today .sub { margin: 8px 0 24px; }
-  textarea { display: block; width: 100%; min-height: 128px; padding: 16px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); font-size: 17px; line-height: 26px; resize: vertical; transition: border-color .15s, box-shadow .15s; }
-  textarea::placeholder { color: var(--ink-3); }
-  textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
-  textarea:disabled { opacity: .6; }
-  .actions { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 16px; }
-  .actions > .tiny { margin-right: auto; }
-  kbd { font: 12px/16px var(--mono); padding: 0 4px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; color: var(--ink-2); }
-  .error { color: var(--red); }
-
-  /* progress */
-  .run { margin-top: 24px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); animation: rise .2s ease-out; }
-  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .step { display: grid; grid-template-columns: 16px 1fr; gap: 8px 12px; align-items: start; font-size: 15px; line-height: 24px; color: var(--ink-3); transition: color .2s; }
-  .step .ind { width: 16px; height: 16px; margin-top: 4px; border-radius: 50%; border: 1.5px solid var(--line-strong); position: relative; }
-  .step.active { color: var(--ink); }
-  .step.active .ind { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
-  .step.done { color: var(--ink-2); }
-  .step.done .ind { border-color: var(--green); background: var(--green); }
-  .step.done .ind::after { content: ""; position: absolute; left: 4.5px; top: 2px; width: 4px; height: 7px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
-  .step.failed { color: var(--red); }
-  .step.failed .ind { border-color: var(--red); background: var(--red); }
-  .step .files { grid-column: 2; font: 13px/20px var(--mono); color: var(--ink-2); }
-  .run-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); flex-wrap: wrap; }
-  .result-links { display: flex; gap: 16px; }
-  details summary { cursor: pointer; color: var(--ink-2); font-size: 14px; list-style: none; }
-  details summary::-webkit-details-marker { display: none; }
-  details summary::before { content: "▸"; display: inline-block; width: 16px; transition: transform .15s; }
-  details[open] summary::before { transform: rotate(90deg); }
-  pre.log { margin: 8px 0 0; padding: 8px 12px; max-height: 240px; overflow: auto; border-radius: 4px; background: var(--bg); font: 12px/20px var(--mono); color: var(--ink-2); white-space: pre-wrap; }
-
-  /* list */
-  .list-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 64px 0 8px; flex-wrap: wrap; }
-  .list-head h2 { font-family: var(--display); font-size: 20px; line-height: 32px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
-  .filters { display: inline-flex; padding: 2px; border-radius: var(--radius); background: var(--line); }
-  .filters button { border: 0; background: transparent; height: 28px; padding: 0 12px; border-radius: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; transition: background-color .15s, color .15s; }
-  .filters button:hover { color: var(--ink); }
-  .filters button[aria-pressed=true] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
-  .filters .n { color: var(--ink-3); margin-left: 4px; font-variant-numeric: tabular-nums; }
-
-  .ideas { list-style: none; margin: 0; padding: 0; }
-  .idea { display: grid; grid-template-columns: 64px 1fr auto; gap: 16px; padding: 16px 8px; margin: 0 -8px; border-top: 1px solid var(--line); border-radius: 4px; transition: background-color .3s; }
-  .idea:first-child { border-top: 0; }
-  .idea.fresh { animation: flash 1.6s ease-out; }
-  .idea time { font-size: 14px; line-height: 24px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-  .idea h3 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; }
-  .idea .tag { margin: 0; font-size: 15px; line-height: 22px; color: var(--ink-2); }
-  .idea .links { display: flex; gap: 16px; margin-top: 8px; font-size: 13px; line-height: 16px; color: var(--ink-2); }
-  .idea .row-error { margin-top: 8px; font-size: 13px; color: var(--red); }
-
-  .status { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; transition: background-color .15s; }
-  .status:hover, .status:focus-within { background: var(--line); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ink-3); }
+  /* sidebar */
+  .sidebar { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--sunk); }
+  .side-top { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 8px 0 16px; }
+  .brand { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+  .side-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 0 16px 16px; }
+  .side-filter { display: flex; gap: 4px; padding: 0 16px 8px; }
+  .side-filter button { border: 0; background: transparent; height: 24px; padding: 0 8px; border-radius: 4px; font-size: 12px; color: var(--ink-3); cursor: pointer; }
+  .side-filter button:hover { color: var(--ink); }
+  .side-filter button[aria-pressed=true] { background: var(--line); color: var(--ink); }
+  .idea-list { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; flex: 1; }
+  .idea-item { display: grid; grid-template-columns: 8px 1fr; gap: 4px 12px; align-items: center; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; transition: background-color .12s; }
+  .idea-item:hover { background: var(--line); }
+  .idea-item[aria-current=true] { background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+  .idea-item .t { font-size: 14px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .idea-item .d { grid-column: 2; font-size: 12px; line-height: 16px; color: var(--ink-3); }
+  .side-foot { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+  .side-foot span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
   .dot.red { background: var(--red); } .dot.yellow { background: var(--amber); } .dot.green { background: var(--green); }
-  .status select { appearance: none; border: 0; background: transparent; font-size: 14px; color: var(--ink-2); cursor: pointer; padding-right: 0; }
-  .status select:focus { outline: none; }
-  .status select:disabled { cursor: default; }
-  .idea.saving .dot { animation: pulse 1s ease-in-out infinite; }
-  .empty { padding: 32px 0; color: var(--ink-2); }
+  .dot.busy { animation: pulse 1s ease-in-out infinite; }
 
-  /* settings dialog */
+  /* chat */
+  .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+  .chat-head { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--line); flex: none; }
+  .chat-head h1 { flex: 1; min-width: 0; margin: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thread { flex: 1; overflow-y: auto; padding: 32px 24px; }
+  .thread-inner { max-width: 680px; margin: 0 auto; display: grid; gap: 24px; }
+  .welcome { padding-top: 12vh; }
+  .welcome h2 { font-family: var(--display); font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+  .welcome p { margin: 8px 0 0; color: var(--ink-2); }
+  .msg.enter { animation: rise .2s ease-out; }
+  .msg.user { justify-self: end; max-width: 85%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: var(--surface); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.assistant { max-width: 100%; }
+  .msg.assistant .body > :first-child { margin-top: 0; }
+  .msg.assistant .body > :last-child { margin-bottom: 0; }
+  .msg.assistant.error .body { color: var(--red); }
+  .tools { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--sunk); font: 12px/16px var(--mono); color: var(--ink-2); }
+  .working { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 14px; }
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line-strong); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
+  .steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; color: var(--ink-3); }
+  .steps li { display: flex; align-items: center; gap: 8px; }
+  .steps .ind { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line-strong); flex: none; position: relative; }
+  .steps li.active { color: var(--ink); }
+  .steps li.active .ind { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+  .steps li.done { color: var(--ink-2); }
+  .steps li.done .ind { background: var(--green); border-color: var(--green); }
+  .steps li.done .ind::after { content: ""; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+
+  .composer { flex: none; padding: 0 24px 24px; }
+  .composer form { max-width: 680px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); transition: border-color .15s, box-shadow .15s; }
+  .composer form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+  .composer textarea { flex: 1; border: 0; background: transparent; resize: none; padding: 6px 0; max-height: 200px; font-size: 15px; line-height: 24px; outline: none; }
+  .composer textarea::placeholder { color: var(--ink-3); }
+  .send { width: 36px; height: 36px; padding: 0; border-radius: 8px; }
+  .send svg { width: 16px; height: 16px; }
+  .hint { max-width: 680px; margin: 8px auto 0; font-size: 12px; color: var(--ink-3); text-align: center; }
+  .error-line { max-width: 680px; margin: 8px auto 0; font-size: 13px; color: var(--red); }
+
+  /* preview panel */
+  .panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--line); background: var(--surface); }
+  .panel-head { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); flex: none; }
+  .tabs { display: inline-flex; padding: 2px; border-radius: var(--radius); background: var(--sunk); }
+  .tabs button { border: 0; background: transparent; height: 28px; padding: 0 12px; border-radius: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; transition: background-color .15s, color .15s; }
+  .tabs button[aria-selected=true] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+  .tabs button:disabled { opacity: .4; cursor: default; }
+  .panel-head .spacer { flex: 1; }
+  .status { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; transition: background-color .15s; }
+  .status:hover, .status:focus-within { background: var(--sunk); }
+  .status select { appearance: none; border: 0; background: transparent; font-size: 13px; color: var(--ink-2); cursor: pointer; outline: none; }
+  .panel-body { flex: 1; min-height: 0; position: relative; }
+  .panel-body iframe { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
+  .readme { height: 100%; overflow-y: auto; padding: 32px; }
+  .readme > div { max-width: 680px; margin: 0 auto; }
+  .panel-empty { height: 100%; display: grid; place-items: center; color: var(--ink-3); font-size: 14px; padding: 24px; text-align: center; }
+
+  /* markdown */
+  .md h1 { font-family: var(--display); font-size: 26px; line-height: 32px; margin: 0 0 8px; letter-spacing: -0.02em; }
+  .md h2 { font-size: 18px; line-height: 24px; margin: 32px 0 8px; }
+  .md h3 { font-size: 15px; line-height: 24px; margin: 24px 0 8px; }
+  .md p, .md ul, .md ol, .md pre, .md blockquote { margin: 0 0 12px; }
+  .md ul, .md ol { padding-left: 24px; }
+  .md li { margin: 2px 0; }
+  .md li.task { list-style: none; margin-left: -24px; }
+  .md li.task input { margin: 0 8px 0 0; vertical-align: -2px; accent-color: var(--green); }
+  .md blockquote { padding-left: 12px; border-left: 3px solid var(--line-strong); color: var(--ink-2); }
+  .md code { font: 13px/1 var(--mono); padding: 2px 4px; border-radius: 4px; background: var(--sunk); }
+  .md pre { padding: 12px 16px; border-radius: var(--radius); background: var(--sunk); overflow-x: auto; }
+  .md pre code { padding: 0; background: none; font-size: 13px; line-height: 20px; }
+
+  /* dialogs */
   dialog { width: min(560px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 16px 48px rgb(0 0 0 / .18); }
   dialog[open] { animation: rise .18s ease-out; }
   dialog::backdrop { background: rgb(20 19 18 / .35); }
   .dlg { padding: 24px; display: grid; gap: 24px; }
   .dlg h2 { margin: 0; font-family: var(--display); font-size: 20px; line-height: 28px; font-weight: 600; }
   .field { display: grid; gap: 8px; }
-  .field label { font-size: 14px; font-weight: 600; }
-  .field .hint { font-size: 13px; line-height: 18px; color: var(--ink-2); margin: 0; }
+  .field > label { font-size: 14px; font-weight: 600; }
+  .field .hint2 { font-size: 13px; line-height: 18px; color: var(--ink-2); margin: 0; }
   .inline { display: flex; gap: 8px; }
-  input[type=text] { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--bg); font-size: 15px; transition: border-color .15s, box-shadow .15s; }
-  input[type=text]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+  input[type=text], input[type=date] { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--bg); font-size: 15px; transition: border-color .15s, box-shadow .15s; }
+  input[type=text]:focus, input[type=date]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
   .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; padding: 12px 16px; border-radius: var(--radius); background: var(--bg); font-size: 13px; line-height: 20px; }
-  .facts dt { color: var(--ink-2); }
-  .facts dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+  .facts dt { color: var(--ink-2); } .facts dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
   .check { display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
   .check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
   .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; }
+  .err { font-size: 13px; color: var(--red); margin: 0; }
 
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes pulse { 50% { opacity: .3; } }
   @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
-  @keyframes flash { from { background: var(--accent-soft); } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-  @media (max-width: 560px) {
-    .bar { margin-bottom: 32px; }
-    .today h1 { font-size: 28px; line-height: 36px; }
-    .idea { grid-template-columns: 1fr auto; }
-    .idea time { grid-column: 1 / -1; line-height: 16px; }
-    .actions .tiny { display: none; }
+  /* narrow screens: sidebar is a drawer, panel is a full-screen sheet */
+  .only-narrow { display: none; }
+  .only-phone { display: none !important; }
+  @media (max-width: 1100px) {
+    .app.with-panel { grid-template-columns: var(--sidebar) minmax(0, 1fr); }
+    .app.with-panel .panel { position: fixed; inset: 0 0 0 auto; width: min(720px, 100vw); z-index: 20; box-shadow: -16px 0 48px rgb(0 0 0 / .15); }
+    .app.with-panel.panel-closed .panel { display: none; }
+    .only-narrow { display: inline-grid; }
+  }
+  @media (max-width: 720px) {
+    .app, .app.with-panel { grid-template-columns: minmax(0, 1fr); }
+    .sidebar { position: fixed; inset: 0 auto 0 0; width: min(300px, 86vw); z-index: 30; transform: translateX(-100%); transition: transform .2s ease-out; box-shadow: 16px 0 48px rgb(0 0 0 / .15); }
+    .app.drawer .sidebar { transform: none; }
+    .only-phone { display: inline-grid !important; }
+    .thread { padding: 24px 16px; }
+    .composer { padding: 0 16px 16px; }
+    .welcome h2 { font-size: 28px; line-height: 36px; }
   }
 </style>
 </head>
 <body>
-<main>
-  <div class="bar">
-    <span class="brand">Idea Cooker</span>
-    <div class="repo small muted">
+<div class="app" id="app">
+  <aside class="sidebar" aria-label="Ideas">
+    <div class="side-top">
+      <span class="brand">Idea Cooker</span>
+      <button class="icon-btn only-phone" id="closeDrawer" type="button" aria-label="Close ideas"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </div>
+    <div class="side-actions">
+      <button class="btn primary" id="newBtn" type="button">New idea</button>
+      <button class="btn" id="importBtn" type="button" title="Add an idea you already built, from a repo link or folder">Import</button>
+    </div>
+    <div class="side-filter" role="group" aria-label="Filter by status" id="filters"></div>
+    <ul class="idea-list" id="ideaList"></ul>
+    <div class="side-foot">
       <span id="repoLabel"></span>
-      <button class="btn ghost small" id="settingsBtn" type="button">Settings</button>
+      <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></button>
     </div>
-  </div>
+  </aside>
 
-  <section class="today" aria-labelledby="todayTitle">
-    <h1 id="todayTitle"></h1>
-    <p class="sub muted" id="todaySub"></p>
-    <form id="ideaForm">
-      <label for="ideaText" class="hidden">Today's idea</label>
-      <textarea id="ideaText" placeholder="What's the idea? Who is it for, and what's the twist?"></textarea>
-      <div class="actions">
-        <span class="tiny muted"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to cook</span>
-        <button class="btn primary" id="cookBtn" type="submit" disabled>Cook idea</button>
-      </div>
-      <p class="small error hidden" id="formError" role="alert"></p>
-    </form>
-
-    <div class="run hidden" id="run" aria-live="polite">
-      <ol class="steps" id="steps"></ol>
-      <div class="run-foot">
-        <div class="result-links small" id="resultLinks"></div>
-        <details id="logBox"><summary>Log</summary><pre class="log" id="log"></pre></details>
-      </div>
+  <section class="chat" aria-label="Chat">
+    <header class="chat-head">
+      <button class="icon-btn only-phone" id="openDrawer" type="button" aria-label="Show ideas"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+      <h1 id="chatTitle">New idea</h1>
+      <button class="btn ghost only-narrow hidden" id="showPanel" type="button">Preview</button>
+    </header>
+    <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
+    <div class="composer">
+      <form id="composer">
+        <label for="input" class="sr">Message</label>
+        <textarea id="input" rows="1" placeholder="Describe today's idea…"></textarea>
+        <button class="btn primary send" id="sendBtn" type="submit" aria-label="Send" disabled><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
+      </form>
+      <p class="error-line hidden" id="chatError" role="alert"></p>
+      <p class="hint" id="hint">Enter to send · Shift+Enter for a new line</p>
     </div>
   </section>
 
-  <section aria-labelledby="ideasTitle">
-    <div class="list-head">
-      <h2 id="ideasTitle">Ideas</h2>
-      <div class="filters" role="group" aria-label="Filter by status" id="filters"></div>
-    </div>
-    <ul class="ideas" id="ideas"></ul>
-    <p class="empty hidden" id="empty"></p>
+  <section class="panel hidden" id="panel" aria-label="Preview">
+    <header class="panel-head">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabProto" aria-selected="true" type="button">Prototype</button>
+        <button role="tab" id="tabReadme" aria-selected="false" type="button">README</button>
+      </div>
+      <span class="spacer"></span>
+      <label class="status" id="statusBox"><span class="dot" id="statusDot"></span><select id="statusSel" aria-label="Status"></select></label>
+      <button class="icon-btn" id="reloadBtn" type="button" aria-label="Reload preview" title="Reload"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.8h-2.8"/></svg></button>
+      <a class="icon-btn" id="openTab" target="_blank" rel="noopener" aria-label="Open in a new tab" title="Open in a new tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V13H3V5h3.5"/></svg></a>
+      <button class="icon-btn only-narrow" id="hidePanel" type="button" aria-label="Close preview"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </header>
+    <div class="panel-body" id="panelBody"></div>
   </section>
-</main>
+</div>
+
+<dialog id="importDlg" aria-labelledby="importTitle">
+  <form class="dlg" method="dialog" id="importForm">
+    <h2 id="importTitle">Import an idea</h2>
+    <div class="field">
+      <label for="importSrc">Repository link or folder</label>
+      <input type="text" id="importSrc" placeholder="https://github.com/you/project" spellcheck="false" autocomplete="off">
+      <p class="hint2">A GitHub repo, a subfolder link (…/tree/main/some-folder) or a folder on this PC. The files are copied into a new dated folder, and Claude writes the README to match your other ideas. The original repo isn't changed.</p>
+    </div>
+    <div class="field">
+      <label for="importDate">Date</label>
+      <input type="date" id="importDate">
+      <p class="hint2">Leave empty to use the date of the project's first commit.</p>
+    </div>
+    <p class="err hidden" id="importErr"></p>
+    <div class="dlg-foot">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" type="button" id="importGo">Import</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="settings" aria-labelledby="settingsTitle">
-  <form class="dlg" method="dialog" id="settingsForm">
+  <form class="dlg" method="dialog">
     <h2 id="settingsTitle">Settings</h2>
     <div class="field">
       <label for="repoPath">Ideas repository</label>
@@ -210,15 +270,15 @@
         <input type="text" id="repoPath" placeholder="C:\path\to\your\ideas-repo" spellcheck="false" autocomplete="off">
         <button class="btn" type="button" id="checkBtn">Check</button>
       </div>
-      <p class="hint">A local git clone. New ideas are committed here, and nothing is written until you save.</p>
+      <p class="hint2">A local git clone. New ideas are committed here, and nothing is written until you save.</p>
       <dl class="facts hidden" id="repoFacts"></dl>
-      <p class="small error hidden" id="repoError"></p>
+      <p class="err hidden" id="repoError"></p>
     </div>
     <label class="check"><input type="checkbox" id="pushBox"> Push to GitHub after each commit</label>
     <div class="field">
       <label for="modelBox">Model</label>
       <input type="text" id="modelBox" placeholder="Claude Code default" spellcheck="false" autocomplete="off">
-      <p class="hint">A model ID such as <code>claude-opus-5-5</code>. Leave empty for the default.</p>
+      <p class="hint2">A model ID such as <code>claude-opus-5-5</code>. Leave empty for the default.</p>
     </div>
     <div class="dlg-foot">
       <button class="btn" value="cancel" formnovalidate>Cancel</button>
@@ -231,12 +291,21 @@
 const $ = (id) => document.getElementById(id);
 const LABELS = { red: "Idea", yellow: "Prototype", green: "Done" };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-let config = null;
-let ideas = [];
-let filter = "all";
-let freshFolder = null;
-let checkedPath = null;
 
+const state = {
+  config: null,
+  ideas: [],
+  filter: "all",
+  folder: null,          // selected idea, null = new idea
+  messages: [],          // chat of the selected idea
+  pending: null,         // { kind, folder, userText, job } while Claude works
+  tab: "proto",
+  previewVersion: Date.now(),
+  panelOpen: true,
+  animateFrom: Infinity, // messages at or after this index fade in on the next render
+};
+
+/* ---------- helpers ---------- */
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
   const data = await r.json().catch(() => ({}));
@@ -244,146 +313,270 @@ async function api(method, url, body) {
   return data;
 }
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const stripEmoji = (s) => String(s || "").replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, "").replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "").trim();
-const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const stripEmoji = (s) => String(s || "").replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "").replace(/\s+/g, " ").trim();
+const pad = (n) => String(n).padStart(2, "0");
+const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 function shortDate(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   return `${d} ${MONTHS[m - 1]}${y !== new Date().getFullYear() ? ` ${y}` : ""}`;
 }
-function repoName(remote, path) {
-  const m = remote && remote.match(/github\.com[:/](.+?)(?:\.git)?$/);
-  return m ? m[1] : (path || "").split(/[\\/]/).filter(Boolean).pop() || "";
+const ready = () => !!(state.config?.repoPath && state.config.confirmed && state.config.repo?.ok);
+const current = () => state.ideas.find((i) => i.folder === state.folder) || null;
+const titleOf = (i) => stripEmoji(i.title) || i.folder;
+
+/* Tiny markdown renderer for READMEs and chat replies (headings, lists, tasks, code, quotes, links, bold, italics). */
+function inline(s) {
+  return esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, t, h) => (/^(https?:|mailto:)/.test(h) ? `<a href="${h}" target="_blank" rel="noopener">${t}</a>` : `<a data-rel="${h}">${t}</a>`))
+    .replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+function md(src) {
+  const lines = String(src || "").replace(/\r/g, "").split("\n");
+  let out = "", list = null, para = [];
+  const flushPara = () => { if (para.length) { out += `<p>${inline(para.join(" "))}</p>`; para = []; } };
+  const flushList = () => { if (list) { out += `</${list}>`; list = null; } };
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    let m;
+    if ((m = l.match(/^```/))) {
+      flushPara(); flushList();
+      const code = [];
+      while (++i < lines.length && !/^```/.test(lines[i])) code.push(lines[i]);
+      out += `<pre><code>${esc(code.join("\n"))}</code></pre>`;
+    } else if ((m = l.match(/^(#{1,3})\s+(.*)/))) {
+      flushPara(); flushList();
+      out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`;
+    } else if ((m = l.match(/^\s*[-*]\s+\[( |x)\]\s+(.*)/i))) {
+      flushPara();
+      if (list !== "ul") { flushList(); out += "<ul>"; list = "ul"; }
+      out += `<li class="task"><input type="checkbox" disabled${m[1].toLowerCase() === "x" ? " checked" : ""}>${inline(m[2])}</li>`;
+    } else if ((m = l.match(/^\s*[-*]\s+(.*)/))) {
+      flushPara();
+      if (list !== "ul") { flushList(); out += "<ul>"; list = "ul"; }
+      out += `<li>${inline(m[1])}</li>`;
+    } else if ((m = l.match(/^\s*\d+\.\s+(.*)/))) {
+      flushPara();
+      if (list !== "ol") { flushList(); out += "<ol>"; list = "ol"; }
+      out += `<li>${inline(m[1])}</li>`;
+    } else if ((m = l.match(/^>\s?(.*)/))) {
+      flushPara(); flushList();
+      out += `<blockquote>${inline(m[1])}</blockquote>`;
+    } else if (!l.trim()) {
+      flushPara(); flushList();
+    } else {
+      flushList();
+      para.push(l.trim());
+    }
+  }
+  flushPara(); flushList();
+  return out;
 }
 
-/* ---------- header + composer ---------- */
-function renderToday() {
-  $("todayTitle").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-  const ready = config.repoPath && config.confirmed && config.repo?.ok;
-  if (!ready) {
-    $("todaySub").textContent = "Choose an ideas repository in Settings to get started.";
+/* ---------- loading ---------- */
+async function loadConfig() {
+  state.config = await api("GET", "/api/config");
+  const r = state.config.repo || {};
+  const m = r.remote && r.remote.match(/github\.com[:/](.+?)(?:\.git)?$/);
+  $("repoLabel").textContent = ready() ? `${m ? m[1] : (state.config.repoPath || "").split(/[\\/]/).pop()} · ${r.branch}${state.config.push && r.remote ? "" : " · local"}` : "No repository";
+  $("repoLabel").title = state.config.repoPath || "";
+}
+async function loadIdeas() {
+  state.ideas = ready() ? await api("GET", "/api/ideas") : [];
+}
+async function loadChat() {
+  state.messages = state.folder ? (await api("GET", `/api/chat/${encodeURIComponent(state.folder)}`)).messages : [];
+}
+
+/* ---------- sidebar ---------- */
+function renderSidebar() {
+  const n = { all: state.ideas.length, red: 0, yellow: 0, green: 0 };
+  state.ideas.forEach((i) => i.status && n[i.status]++);
+  $("filters").innerHTML = [["all", "All"], ["red", "Idea"], ["yellow", "Prototype"], ["green", "Done"]]
+    .map(([k, l]) => `<button type="button" data-f="${k}" aria-pressed="${state.filter === k}">${l} ${n[k]}</button>`).join("");
+  $("filters").classList.toggle("hidden", !state.ideas.length);
+  const busyFolder = state.pending?.folder;
+  $("ideaList").innerHTML = state.ideas
+    .filter((i) => state.filter === "all" || i.status === state.filter)
+    .map((i) => `<li><button type="button" class="idea-item" data-folder="${esc(i.folder)}" aria-current="${i.folder === state.folder}">
+        <span class="dot ${i.status || ""}${i.folder === busyFolder ? " busy" : ""}"></span>
+        <span class="t">${esc(titleOf(i))}</span>
+        <span class="d">${esc(shortDate(i.date))}</span>
+      </button></li>`).join("") || `<li class="muted" style="padding:8px;font-size:13px">${state.ideas.length ? "Nothing with this status." : "No ideas yet."}</li>`;
+  $("newBtn").setAttribute("aria-current", String(state.folder === null));
+}
+
+/* ---------- chat ---------- */
+function streak() {
+  const days = new Set(state.ideas.map((i) => i.date));
+  const d = new Date();
+  if (!days.has(isoOf(d))) d.setDate(d.getDate() - 1);
+  let s = 0;
+  while (days.has(isoOf(d))) { s++; d.setDate(d.getDate() - 1); }
+  return s;
+}
+
+const COOK_STEPS = [["pull", "Pull the latest"], ["write", "Write the README and prototype"], ["commit", "Commit"], ["push", "Push"]];
+function phase(job) {
+  const s = { pull: "", write: "", commit: "", push: "" };
+  for (const raw of job?.log || []) {
+    const l = raw.replace(/^\S+\s+/, "");
+    if (/^git pull/.test(l)) s.pull = "active";
+    if (/^No upstream/.test(l)) s.pull = "done";
+    if (/^Asking Claude|^\[fake mode\]|^git clone/.test(l)) { s.pull = "done"; s.write = "active"; }
+    if (/^Created |^Committed /.test(l)) s.write = "done";
+    if (/^Created /.test(l)) s.commit = "active";
+    if (/^Committed /.test(l)) { s.commit = "done"; s.push = "active"; }
+    if (/^Nothing to commit/.test(l)) { s.write = "done"; s.commit = "done"; }
+    if (/^Pushed\.|^Push is turned off|^No 'origin'/.test(l)) s.push = "done";
+  }
+  return s;
+}
+
+function messageHtml(m) {
+  if (m.role === "user") return `<div class="msg user">${esc(m.text)}</div>`;
+  const tools = (m.tools || []).length ? `<div class="tools">${[...new Set(m.tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
+  return `<div class="msg assistant${m.error ? " error" : ""}"><div class="body md">${m.error ? esc(m.text) : md(m.text)}</div>${tools}</div>`;
+}
+
+function pendingHtml(p) {
+  const job = p.job;
+  const tools = (job?.events || []).filter((e) => e.kind === "tool").map((e) => e.text);
+  let steps = "";
+  if (p.kind === "cook" || p.kind === "import") {
+    const s = phase(job);
+    const labels = p.kind === "import" ? [["pull", "Pull the latest"], ["write", "Copy the files and write the README"], ["commit", "Commit"], ["push", "Push"]] : COOK_STEPS;
+    steps = `<ul class="steps">${labels.map(([k, l]) => `<li class="${s[k]}"><span class="ind"></span>${l}</li>`).join("")}</ul>`;
+  }
+  const chips = tools.length ? `<div class="tools">${[...new Set(tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
+  const label = p.kind === "revise" ? "Claude is working on it…" : p.kind === "import" ? "Importing…" : "Cooking your idea…";
+  return `${p.userText ? `<div class="msg user">${esc(p.userText)}</div>` : ""}
+    <div class="msg assistant"><div class="working"><span class="spinner"></span>${label}</div>${steps}${chips}</div>`;
+}
+
+/* While Claude works only the pending block changes, and only when its content does, so nothing flickers. */
+function updatePending() {
+  const box = document.getElementById("pendingBox");
+  const p = state.pending;
+  if (!box || !p) return renderChat();
+  const html = pendingHtml(p);
+  if (box.dataset.html === html) return;
+  const t = $("thread");
+  const atBottom = t.scrollHeight - t.scrollTop - t.clientHeight < 80;
+  box.dataset.html = html;
+  box.innerHTML = html;
+  if (atBottom) t.scrollTop = t.scrollHeight;
+}
+
+function renderChat() {
+  const idea = current();
+  $("chatTitle").textContent = idea ? titleOf(idea) : state.pending?.kind === "import" ? "Import" : "New idea";
+  const parts = [];
+  if (!idea && !(state.pending && !state.pending.folder)) {
+    const today = state.ideas.filter((i) => i.date === isoOf(new Date())).length;
+    const s = streak();
+    const sub = !ready() ? "Choose your ideas repository in Settings to get started."
+      : `${today ? `${today} idea${today > 1 ? "s" : ""} today.` : "No idea yet today."}${s > 1 ? ` ${s}-day streak.` : ""} Describe it in a sentence or two, and Claude builds a first prototype.`;
+    parts.push(`<div class="welcome"><h2>${esc(new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }))}</h2><p>${esc(sub)}</p></div>`);
+  }
+  if (idea && !state.messages.length && !(state.pending && state.pending.folder === idea.folder)) {
+    parts.push(`<div class="msg assistant"><div class="body md"><p>${esc(titleOf(idea))} is open on the right. Ask for a change, like “make it work on phones” or “add a dark mode”, and Claude will edit the prototype and update its README.</p></div></div>`);
+  }
+  state.messages.forEach((m, i) => parts.push(i >= state.animateFrom ? messageHtml(m).replace('class="msg ', 'class="msg enter ') : messageHtml(m)));
+  state.animateFrom = Infinity;
+  const p = state.pending;
+  if (p && p.kind !== "status" && (p.folder === state.folder || (!p.folder && state.folder === null))) {
+    const html = pendingHtml(p);
+    parts.push(`<div id="pendingBox" class="msg enter" style="display:grid;gap:24px" data-html="${esc(html)}">${html}</div>`);
+  }
+  $("threadInner").innerHTML = parts.join("");
+  const t = $("thread");
+  t.scrollTop = t.scrollHeight;
+
+  $("input").placeholder = idea ? `Ask for a change to ${titleOf(idea)}…` : "Describe today's idea…";
+  $("input").disabled = !ready();
+  updateSend();
+}
+
+function updateSend() {
+  $("sendBtn").disabled = !ready() || !!state.pending || !$("input").value.trim();
+  $("hint").textContent = state.pending ? "Claude is working. You can look around in the meantime." : "Enter to send · Shift+Enter for a new line";
+}
+
+/* ---------- preview panel ---------- */
+function renderPanel() {
+  const idea = current();
+  const app = $("app");
+  app.classList.toggle("with-panel", !!idea);
+  app.classList.toggle("panel-closed", !state.panelOpen);
+  $("panel").classList.toggle("hidden", !idea);
+  $("showPanel").classList.toggle("hidden", !idea);
+  if (!idea) return;
+
+  const hasProto = !!idea.entry;
+  if (!hasProto && state.tab === "proto") state.tab = "readme";
+  $("tabProto").disabled = !hasProto;
+  $("tabProto").setAttribute("aria-selected", String(state.tab === "proto"));
+  $("tabReadme").setAttribute("aria-selected", String(state.tab === "readme"));
+
+  const sel = $("statusSel");
+  sel.innerHTML = (idea.status ? "" : `<option value="">No status</option>`) + Object.entries(LABELS).map(([k, l]) => `<option value="${k}"${idea.status === k ? " selected" : ""}>${l}</option>`).join("");
+  sel.disabled = !!state.pending;
+  $("statusDot").className = `dot ${idea.status || ""}${state.pending?.kind === "status" ? " busy" : ""}`;
+  $("statusBox").title = idea.statusText || "";
+
+  const origin = state.config.previewOrigin;
+  const base = `${origin}/${encodeURIComponent(idea.folder)}/`;
+  const body = $("panelBody");
+  if (state.tab === "proto") {
+    const src = `${base}${idea.entry.split("/").map(encodeURIComponent).join("/")}?v=${state.previewVersion}`;
+    const frame = body.querySelector("iframe");
+    if (!frame || frame.dataset.src !== src) {
+      body.innerHTML = `<iframe title="Prototype of ${esc(titleOf(idea))}" data-src="${esc(src)}" src="${esc(src)}"></iframe>`;
+    }
+    $("openTab").href = src;
+  } else {
+    $("openTab").href = `${base}README.md`;
+    const key = `${idea.folder}:${state.previewVersion}`;
+    if (body.dataset.readme !== key) {
+      body.dataset.readme = key;
+      body.innerHTML = `<div class="readme"><div class="md muted">Loading…</div></div>`;
+      api("GET", `/api/ideas/${encodeURIComponent(idea.folder)}/readme`)
+        .then(({ text }) => {
+          if (body.dataset.readme !== key || state.tab !== "readme") return;
+          body.innerHTML = `<div class="readme"><div class="md">${md(text)}</div></div>`;
+          body.querySelectorAll("a[data-rel]").forEach((a) => { a.href = base + a.dataset.rel; a.target = "_blank"; a.rel = "noopener"; });
+        })
+        .catch(() => { body.innerHTML = `<div class="panel-empty">This idea has no README yet.</div>`; });
+    }
     return;
   }
-  const today = ideas.filter((i) => i.date === isoToday());
-  const days = new Set(ideas.map((i) => i.date));
-  let streak = 0;
-  const d = new Date();
-  if (!days.has(isoToday())) d.setDate(d.getDate() - 1);
-  for (;;) {
-    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    if (!days.has(k)) break;
-    streak++;
-    d.setDate(d.getDate() - 1);
-  }
-  const parts = [];
-  if (today.length > 1) parts.push(`${today.length} ideas today.`);
-  else if (today.length) parts.push(`Today's idea: ${stripEmoji(today[0].title).replace(/[.!?]$/, "")}.`);
-  else parts.push("No idea yet today.");
-  if (streak > 1) parts.push(`${streak}-day streak.`);
-  $("todaySub").textContent = parts.join(" ");
+  delete body.dataset.readme;
 }
 
-function renderRepo() {
-  const ready = config.repoPath && config.confirmed && config.repo?.ok;
-  const r = config.repo || {};
-  $("repoLabel").textContent = ready ? `${repoName(r.remote, config.repoPath)} · ${r.branch}${config.push && r.remote ? "" : " · local only"}` : "No repository";
-  $("repoLabel").title = ready ? config.repoPath : "";
-  updateCookBtn();
+function renderAll() {
+  renderSidebar();
+  renderChat();
+  renderPanel();
 }
 
-function updateCookBtn() {
-  const ready = config?.repoPath && config.confirmed && config.repo?.ok;
-  $("cookBtn").disabled = !ready || running || !$("ideaText").value.trim();
-}
-
-/* ---------- list ---------- */
-function renderFilters() {
-  const n = { all: ideas.length, red: 0, yellow: 0, green: 0 };
-  ideas.forEach((i) => i.status && n[i.status]++);
-  const opts = [["all", "All"], ["red", "Idea"], ["yellow", "Prototype"], ["green", "Done"]];
-  $("filters").innerHTML = opts.map(([k, l]) => `<button type="button" data-f="${k}" aria-pressed="${filter === k}">${l}<span class="n">${n[k]}</span></button>`).join("");
-  $("filters").classList.toggle("hidden", ideas.length === 0);
-}
-
-function renderIdeas() {
-  const shown = ideas.filter((i) => filter === "all" || i.status === filter);
-  $("ideas").innerHTML = shown.map((i) => {
-    const proto = i.files.find((f) => /\.html?$/i.test(f));
-    const base = `/ideas/${encodeURIComponent(i.folder)}/`;
-    const title = stripEmoji(i.title) || i.folder;
-    return `<li class="idea${i.folder === freshFolder ? " fresh" : ""}" data-folder="${esc(i.folder)}">
-      <time datetime="${esc(i.date)}">${esc(shortDate(i.date))}</time>
-      <div>
-        <h3>${esc(title)}</h3>
-        ${i.tagline ? `<p class="tag">${esc(i.tagline)}</p>` : ""}
-        <div class="links">
-          ${proto ? `<a href="${base}${encodeURIComponent(proto)}" target="_blank" rel="noopener">Open prototype</a>` : ""}
-          <a href="${base}README.md" target="_blank" rel="noopener">README</a>
-        </div>
-        <div class="row-error hidden" role="alert"></div>
-      </div>
-      <label class="status" title="${esc(i.statusText)}">
-        <span class="dot ${i.status || ""}"></span>
-        <select aria-label="Status of ${esc(title)}">
-          ${i.status ? "" : `<option value="" selected>No status</option>`}
-          ${Object.entries(LABELS).map(([k, l]) => `<option value="${k}"${i.status === k ? " selected" : ""}>${l}</option>`).join("")}
-        </select>
-      </label>
-    </li>`;
-  }).join("");
-  const empty = $("empty");
-  empty.classList.toggle("hidden", shown.length > 0);
-  empty.textContent = ideas.length ? "Nothing with this status." : "No ideas yet. Today's can be the first.";
-  freshFolder = null;
-}
-
-async function refresh() {
-  config = await api("GET", "/api/config");
-  ideas = config.repoPath && config.confirmed ? await api("GET", "/api/ideas") : [];
-  renderRepo();
-  renderToday();
-  renderFilters();
-  renderIdeas();
+/* ---------- navigation ---------- */
+async function select(folder) {
+  state.folder = folder || null;
+  state.tab = "proto";
+  state.panelOpen = true;
+  $("chatError").classList.add("hidden");
+  $("app").classList.remove("drawer");
+  const h = folder ? `#/${folder}` : "#/";
+  if (location.hash !== h) history.replaceState(null, "", h);
+  await loadChat().catch(() => (state.messages = []));
+  renderAll();
+  $("input").focus();
 }
 
 /* ---------- jobs ---------- */
-let running = false;
-const COOK_STEPS = [
-  { key: "pull", label: "Pull the latest from GitHub" },
-  { key: "write", label: "Claude writes the README and prototype" },
-  { key: "commit", label: "Commit" },
-  { key: "push", label: "Push" },
-];
-
-function phaseOf(log) {
-  const state = { pull: "pending", write: "pending", commit: "pending", push: "pending", files: [] };
-  for (const raw of log) {
-    const l = raw.replace(/^\S+\s+/, "");
-    if (/^git pull|^No upstream/.test(l)) state.pull = "active";
-    if (/^No upstream/.test(l)) state.pull = "done";
-    if (/^Asking Claude|^\[fake mode\]/.test(l)) { state.pull = "done"; state.write = "active"; }
-    if (/^Write /.test(l)) state.files.push(l.slice(6));
-    if (/^Created /.test(l)) { state.write = "done"; state.commit = "active"; }
-    if (/^Committed /.test(l)) { state.commit = "done"; state.push = "active"; }
-    if (/^Pushed\.|^Push is turned off|^No 'origin'/.test(l)) state.push = "done";
-  }
-  return state;
-}
-
-function renderSteps(job) {
-  const s = phaseOf(job.log);
-  if (job.state === "error") {
-    const k = COOK_STEPS.find((x) => s[x.key] === "active") || COOK_STEPS.find((x) => s[x.key] === "pending");
-    if (k) s[k.key] = "failed";
-  }
-  $("steps").innerHTML = COOK_STEPS.map((x) => {
-    const st = s[x.key];
-    const files = x.key === "write" && s.files.length ? `<div class="files">${[...new Set(s.files)].map(esc).join("<br>")}</div>` : "";
-    return `<li class="step ${st === "pending" ? "" : st}"><span class="ind" aria-hidden="true"></span><span>${x.label}${st === "failed" ? " failed" : ""}</span>${files}</li>`;
-  }).join("");
-  $("log").textContent = job.log.join("\n");
-  $("log").scrollTop = $("log").scrollHeight;
-}
-
 async function poll(jobId, onTick) {
   for (;;) {
     const job = await api("GET", `/api/jobs/${jobId}`);
@@ -393,99 +586,143 @@ async function poll(jobId, onTick) {
   }
 }
 
-async function cook() {
-  const idea = $("ideaText").value.trim();
-  if (!idea || running) return;
-  $("formError").classList.add("hidden");
+async function runJob(kind, request, userText, folder) {
+  $("chatError").classList.add("hidden");
   let jobId;
   try {
-    ({ jobId } = await api("POST", "/api/ideas", { idea }));
+    ({ jobId } = await request());
   } catch (e) {
-    showFormError(e.message);
-    return;
+    showError(e.message);
+    return null;
   }
-  running = true;
-  $("ideaText").disabled = true;
-  updateCookBtn();
-  $("cookBtn").textContent = "Cooking…";
-  $("run").classList.remove("hidden");
-  $("resultLinks").innerHTML = "";
-  $("logBox").open = false;
-  const job = await poll(jobId, renderSteps).catch((e) => ({ state: "error", error: e.message, log: [] }));
-  running = false;
-  $("ideaText").disabled = false;
-  $("cookBtn").textContent = "Cook idea";
-  if (job.state === "done") {
-    $("ideaText").value = "";
-    const f = job.result.folder;
-    const base = `/ideas/${encodeURIComponent(f)}/`;
-    freshFolder = f;
-    $("resultLinks").innerHTML = `<span class="muted">${esc(f)}/</span><a href="${base}index.html" target="_blank" rel="noopener">Open prototype</a><a href="${base}README.md" target="_blank" rel="noopener">README</a>`;
-  } else {
-    renderSteps(job);
-    showFormError(job.error || "Something went wrong.");
-    $("logBox").open = true;
-  }
-  await refresh();
+  return follow(jobId, kind, userText, folder);
 }
 
-function showFormError(msg) {
-  $("formError").textContent = msg;
-  $("formError").classList.remove("hidden");
+async function follow(jobId, kind, userText, folder) {
+  state.pending = { kind, folder, userText, job: null };
+  renderAll();
+  const job = await poll(jobId, (j) => {
+    state.pending.job = j;
+    if (kind === "status") return;
+    updatePending();
+  }).catch((e) => ({ state: "error", error: e.message }));
+  state.pending = null;
+  state.animateFrom = state.messages.length;
+  await loadIdeas();
+  if (job.state === "done") state.previewVersion = Date.now();
+  else showError(job.error || "Something went wrong.");
+  return job;
 }
 
-$("ideaForm").addEventListener("submit", (e) => { e.preventDefault(); cook(); });
-$("ideaText").addEventListener("input", updateCookBtn);
-$("ideaText").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); cook(); }
+/* After a reload (or in a second tab), pick up a job that is still running. */
+async function reattach() {
+  const id = state.config?.busy;
+  if (!id || state.pending) return;
+  const j = await api("GET", `/api/jobs/${id}`).catch(() => null);
+  if (!j || j.state !== "running") return;
+  const kind = j.kind;
+  const folder = kind === "cook" || kind === "import" ? null : j.folder;
+  if (kind !== "status" && state.folder !== folder) await select(folder);
+  const job = await follow(id, kind, j.text || "", folder);
+  if (job.state === "done" && job.result?.folder && !folder) return select(job.result.folder);
+  if (state.folder === folder) await loadChat();
+  renderAll();
+}
+
+function showError(msg) {
+  $("chatError").textContent = msg;
+  $("chatError").classList.remove("hidden");
+}
+
+async function send() {
+  const text = $("input").value.trim();
+  if (!text || state.pending || !ready()) return;
+  $("input").value = "";
+  autosize();
+  const folder = state.folder;
+  const job = await runJob(folder ? "revise" : "cook", () => api("POST", "/api/chat", { folder, message: text }), text, folder);
+  if (!job) { $("input").value = text; autosize(); updateSend(); return; }
+  if (!folder && job.state === "done") return select(job.result.folder);
+  if (!folder && job.state !== "done") { $("input").value = text; autosize(); }
+  if (state.folder === folder) await loadChat();
+  renderAll();
+}
+
+/* ---------- events ---------- */
+function autosize() {
+  const t = $("input");
+  t.style.height = "auto";
+  t.style.height = Math.min(t.scrollHeight, 200) + "px";
+}
+$("input").addEventListener("input", () => { autosize(); updateSend(); });
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
 });
+$("composer").addEventListener("submit", (e) => { e.preventDefault(); send(); });
 
+$("ideaList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-folder]");
+  if (b) select(b.dataset.folder);
+});
 $("filters").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-f]");
+  const b = e.target.closest("[data-f]");
   if (!b) return;
-  filter = b.dataset.f;
-  renderFilters();
-  renderIdeas();
+  state.filter = b.dataset.f;
+  renderSidebar();
+});
+$("newBtn").addEventListener("click", () => select(null));
+$("openDrawer").addEventListener("click", () => $("app").classList.add("drawer"));
+$("closeDrawer").addEventListener("click", () => $("app").classList.remove("drawer"));
+$("showPanel").addEventListener("click", () => { state.panelOpen = true; renderPanel(); });
+$("hidePanel").addEventListener("click", () => { state.panelOpen = false; renderPanel(); });
+
+$("tabProto").addEventListener("click", () => { state.tab = "proto"; renderPanel(); });
+$("tabReadme").addEventListener("click", () => { state.tab = "readme"; renderPanel(); });
+$("reloadBtn").addEventListener("click", () => { state.previewVersion = Date.now(); renderPanel(); });
+
+$("statusSel").addEventListener("change", async () => {
+  const idea = current();
+  const status = $("statusSel").value;
+  if (!idea || !status) return;
+  $("statusDot").className = `dot ${status} busy`;
+  await runJob("status", () => api("POST", `/api/ideas/${encodeURIComponent(idea.folder)}/status`, { status }), "", idea.folder);
+  renderAll();
 });
 
-$("ideas").addEventListener("change", async (e) => {
-  const sel = e.target.closest("select");
-  if (!sel) return;
-  const row = sel.closest(".idea");
-  const folder = row.dataset.folder;
-  const status = sel.value;
-  const errBox = row.querySelector(".row-error");
-  row.classList.add("saving");
-  row.querySelector(".dot").className = `dot ${status}`;
-  sel.disabled = true;
-  errBox.classList.add("hidden");
-  try {
-    const { jobId } = await api("POST", `/api/ideas/${encodeURIComponent(folder)}/status`, { status });
-    const job = await poll(jobId);
-    if (job.state !== "done") throw new Error(job.error || "Couldn't save the status.");
-    await refresh();
-  } catch (err) {
-    row.classList.remove("saving");
-    sel.disabled = false;
-    const old = ideas.find((i) => i.folder === folder)?.status || "";
-    sel.value = old;
-    row.querySelector(".dot").className = `dot ${old}`;
-    errBox.textContent = err.message;
-    errBox.classList.remove("hidden");
-  }
+/* import */
+$("importBtn").addEventListener("click", () => {
+  if (!ready()) return openSettings();
+  $("importErr").classList.add("hidden");
+  $("importSrc").value = "";
+  $("importDate").value = "";
+  $("importDlg").showModal();
 });
+$("importGo").addEventListener("click", async () => {
+  const source = $("importSrc").value.trim();
+  if (!source) { $("importErr").textContent = "Paste a link or a folder path."; $("importErr").classList.remove("hidden"); return; }
+  if (state.pending) { $("importErr").textContent = "Claude is still working on the last request."; $("importErr").classList.remove("hidden"); return; }
+  $("importDlg").close();
+  state.folder = null;
+  state.messages = [];
+  history.replaceState(null, "", "#/");
+  const job = await runJob("import", () => api("POST", "/api/import", { source, date: $("importDate").value || undefined }), `Import ${source}`, null);
+  if (job?.state === "done") return select(job.result.folder);
+  renderAll();
+});
+$("importSrc").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("importGo").click(); } });
 
-/* ---------- settings ---------- */
+/* settings */
+let checkedPath = null;
 function openSettings() {
-  $("repoPath").value = config.repoPath || "";
-  $("pushBox").checked = config.push !== false;
-  $("modelBox").value = config.model || "";
+  const c = state.config;
+  $("repoPath").value = c.repoPath || "";
+  $("pushBox").checked = c.push !== false;
+  $("modelBox").value = c.model || "";
   $("repoFacts").classList.add("hidden");
   $("repoError").classList.add("hidden");
-  checkedPath = config.confirmed ? config.repoPath : null;
+  checkedPath = c.confirmed ? c.repoPath : null;
   $("settings").showModal();
 }
-
 async function checkRepo() {
   const p = $("repoPath").value.trim();
   $("repoError").classList.add("hidden");
@@ -495,12 +732,7 @@ async function checkRepo() {
   try {
     const r = await api("POST", "/api/repo/check", { repoPath: p });
     if (!r.ok) throw new Error(r.error);
-    const rows = [
-      ["Folder", r.toplevel],
-      ["Branch", r.upstream ? `${r.branch} → ${r.upstream}` : `${r.branch} (no upstream)`],
-      ["Remote", r.remote || "none, so commits stay local"],
-      ["Ideas", String(r.ideas)],
-    ];
+    const rows = [["Folder", r.toplevel], ["Branch", r.upstream ? `${r.branch} → ${r.upstream}` : `${r.branch} (no upstream)`], ["Remote", r.remote || "none, so commits stay local"], ["Ideas", String(r.ideas)]];
     if (r.dirtyFiles) rows.push(["Uncommitted", `${r.dirtyFiles} file(s)`]);
     $("repoFacts").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
     $("repoFacts").classList.remove("hidden");
@@ -515,30 +747,41 @@ async function checkRepo() {
     $("checkBtn").disabled = false;
   }
 }
-
 $("settingsBtn").addEventListener("click", openSettings);
 $("checkBtn").addEventListener("click", checkRepo);
 $("repoPath").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkRepo(); } });
 $("saveBtn").addEventListener("click", async () => {
   const p = $("repoPath").value.trim();
   const body = { push: $("pushBox").checked, model: $("modelBox").value };
-  if (p && (p !== config.repoPath || !config.confirmed)) {
+  if (p && (p !== state.config.repoPath || !state.config.confirmed)) {
     if (checkedPath !== p && !(await checkRepo())) return;
     body.repoPath = p;
   }
   try {
     await api("POST", "/api/config", body);
     $("settings").close();
-    await refresh();
+    await loadConfig();
+    await loadIdeas();
+    renderAll();
   } catch (e) {
     $("repoError").textContent = e.message;
     $("repoError").classList.remove("hidden");
   }
 });
 
-refresh()
-  .then(() => { if (!(config.repoPath && config.confirmed)) openSettings(); })
-  .catch((e) => showFormError(e.message));
+/* start */
+(async () => {
+  try {
+    await loadConfig();
+    await loadIdeas();
+    const f = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
+    await select(state.ideas.some((i) => i.folder === f) ? f : null);
+    if (!ready()) openSettings();
+    else reattach();
+  } catch (e) {
+    showError(e.message);
+  }
+})();
 </script>
 </body>
 </html>
