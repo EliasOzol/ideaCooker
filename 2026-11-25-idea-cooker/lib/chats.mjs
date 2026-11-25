@@ -26,6 +26,9 @@ export function chatStore(dir) {
       await fs.writeFile(file(folder), JSON.stringify(chat, null, 2), "utf8");
       return chat;
     },
+    async remove(folder) {
+      await fs.rm(file(folder), { force: true });
+    },
     async has(folder) {
       return fs
         .access(file(folder))

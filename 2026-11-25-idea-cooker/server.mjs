@@ -155,8 +155,10 @@ async function handle(req, res) {
     const cfg = await loadConfig();
     if (!cfg.repoPath || !cfg.confirmed) return send(res, 200, []);
     const ideas = await listIdeas(cfg.repoPath);
+    const appFolder = path.relative(path.resolve(cfg.repoPath), path.resolve(here)).split(path.sep)[0];
     for (const i of ideas) {
       i.hasChat = await chats.has(i.folder);
+      i.isApp = i.folder === appFolder;
       const link = await readLink(cfg.repoPath, i.folder);
       if (link) {
         const repo = parseRepoUrl(link.repo);
@@ -239,17 +241,17 @@ async function handle(req, res) {
   // One endpoint for the chat box: no folder = cook a new idea, a folder = change that idea.
   if (req.method === "POST" && p === "/api/chat") {
     const cfg = await requireRepo();
-    const { folder, message } = await readJson(req);
+    const { folder, message, saveOnly } = await readJson(req);
     const text = String(message || "").trim();
     if (!text) throw httpError(400, "Write a message first.");
 
     if (!folder) {
-      const job = startJob("cook", { folder: null, text }, async ({ log, emit, job }) => {
+      const job = startJob("cook", { folder: null, text, saveOnly: !!saveOnly }, async ({ log, emit, job }) => {
         await pullIfRemote(cfg.repoPath, log);
-        const r = await cookIdea({ repoPath: cfg.repoPath, idea: text, model: cfg.model, log, emit });
+        const r = await cookIdea({ repoPath: cfg.repoPath, idea: text, model: cfg.model, log, emit, saveOnly: !!saveOnly });
         job.folder = r.folder;
         log(`Created ${r.folder}/`);
-        const g = await commitAndPush(cfg.repoPath, [r.folder], `Daily idea: ${r.folder}\n\n${text.split("\n")[0].slice(0, 72)}`, { push: cfg.push, log });
+        const g = await commitAndPush(cfg.repoPath, [r.folder], `${saveOnly ? "Saved idea" : "Daily idea"}: ${r.folder}\n\n${text.split("\n")[0].slice(0, 72)}`, { push: cfg.push, log });
         await chats.append(r.folder, [
           { role: "user", text, at: now() },
           { role: "assistant", text: r.reply, tools: toolsOf(job), at: now() },
@@ -314,6 +316,28 @@ async function handle(req, res) {
     const job = jobs.get(m[1]);
     if (!job) throw httpError(404, "No such job");
     return send(res, 200, job);
+  }
+
+  // Remove an idea: delete its folder, commit and push. A linked repo itself is never touched.
+  if (req.method === "POST" && (m = p.match(/^\/api\/ideas\/([\w.-]+)\/remove$/))) {
+    const cfg = await requireRepo();
+    const folder = checkFolder(m[1]);
+    const dir = path.join(cfg.repoPath, folder);
+    if (path.resolve(dir) === path.resolve(here) || path.resolve(here).startsWith(path.resolve(dir) + path.sep)) {
+      throw httpError(400, "That folder holds this app, so it can't be removed from here.");
+    }
+    if (!(await fs.stat(dir).catch(() => null))?.isDirectory()) throw httpError(404, "That idea doesn't exist.");
+    const job = startJob("remove", { folder, text: "" }, async ({ log }) => {
+      await pullIfRemote(cfg.repoPath, log);
+      const link = await readLink(cfg.repoPath, folder);
+      await fs.rm(dir, { recursive: true, force: true });
+      log(`Removed ${folder}/`);
+      const g = await commitAndPush(cfg.repoPath, [folder], `Remove idea: ${folder}`, { push: cfg.push, log });
+      await chats.remove(folder);
+      if (link) log(`${parseRepoUrl(link.repo).label} itself wasn't changed.`);
+      return { folder, ...g };
+    });
+    return send(res, 202, { jobId: job.id });
   }
 
   if (req.method === "POST" && (m = p.match(/^\/api\/ideas\/([\w.-]+)\/status$/))) {

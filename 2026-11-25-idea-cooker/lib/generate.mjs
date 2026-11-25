@@ -135,12 +135,38 @@ async function runClaude({ root, prompt, scope, resume, model, log, emit }) {
 }
 
 /** New idea: Claude creates `<today>-<slug>/` with README + prototype. */
-export async function cookIdea({ repoPath, idea, model, log, emit = () => {} }) {
+export async function cookIdea({ repoPath, idea, model, log, emit = () => {}, saveOnly = false }) {
   const root = path.resolve(repoPath);
   const date = today();
   const existing = await topFolders(root);
   const existingLower = new Set(existing.map((n) => n.toLowerCase()));
-  if (FAKE()) return fakeCook({ root, idea, date, existingLower, log, emit });
+  if (FAKE()) return fakeCook({ root, idea, date, existingLower, log, emit, saveOnly });
+  if (saveOnly) {
+    const prompt = `You are helping with a "daily idea" practice. The user wants to write down an idea now and maybe build it later. Their daily-ideas git repository is your current working directory.
+
+The idea, in the user's words:
+<idea>
+${idea}
+</idea>
+
+Do this:
+1. Pick a short, catchy name for the idea and a kebab-case slug (2-4 words, lowercase a-z, 0-9 and hyphens).
+2. Create exactly ONE new folder in the repository root named \`${date}-<slug>\`, and write only \`README.md\` in it. These folders already exist, so do not use or touch them: ${existing.length ? existing.join(", ") : "(none)"}.
+3. Follow the example below: ${README_FORMAT(date)}
+4. There is no prototype yet. Under "## The prototype", write one or two sentences on what a first prototype could be, and leave out "### Run it".
+5. The status must be "🔴 **Idea.** Not built yet." The first item under "## Next steps" is "Build a first prototype".
+6. Keep it short; don't invent detail the user didn't give. ${RULES}
+
+Reply in 1-2 short sentences: the name you picked and one question or suggestion that would sharpen the idea.
+
+Example README (it has a prototype; yours won't):
+<example_readme>
+${await example()}
+</example_readme>`;
+    const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, log, emit });
+    if (!r.folder) throw new Error("Claude didn't write any files.");
+    return r;
+  }
 
   const prompt = `You are helping with a "daily idea" practice. Every day the user writes down one idea, and it gets a README and a small, working prototype in their daily-ideas git repository (your current working directory).
 
@@ -265,7 +291,17 @@ ${await example()}
 
 /* ---------- test doubles: IDEA_COOKER_FAKE=1 skips Claude ---------- */
 
-async function fakeCook({ root, idea, date, existingLower, log, emit }) {
+async function fakeCook({ root, idea, date, existingLower, log, emit, saveOnly }) {
+  if (saveOnly) {
+    const slug = idea.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").split("-").slice(0, 3).join("-") || "idea";
+    let folder = `${date}-${slug}`;
+    for (let i = 2; existingLower.has(folder.toLowerCase()); i++) folder = `${date}-${slug}-${i}`;
+    await fs.mkdir(path.join(root, folder));
+    await fs.writeFile(path.join(root, folder, "README.md"), `# 💡 ${idea.slice(0, 40)}\n\n> Saved idea (test).\n\n**Daily idea · ${date}**\n\n## The idea\n\n${idea}\n\n## Status\n\n🔴 **Idea.** Not built yet.\n\n## Next steps\n\n- [ ] Build a first prototype\n`);
+    log(`Write ${folder}/README.md`);
+    emit({ kind: "tool", text: `Wrote ${folder}/README.md` });
+    return { folder, sessionId: `fake-${folder}`, reply: `[fake] Saved “${idea.slice(0, 40)}”.` };
+  }
   const slug = idea.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").split("-").slice(0, 3).join("-") || "idea";
   let folder = `${date}-${slug}`;
   for (let i = 2; existingLower.has(folder.toLowerCase()); i++) folder = `${date}-${slug}-${i}`;

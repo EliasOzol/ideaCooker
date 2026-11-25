@@ -46,7 +46,8 @@ export async function pullIfRemote(repoPath, log) {
 
 /** Commit only `paths` (folder names relative to the repo) and optionally push. */
 export async function commitAndPush(repoPath, paths, message, { push, log }) {
-  await mustGit(repoPath, ["add", "--", ...paths]);
+  // -A also stages deletions, so removing an idea's folder commits like any other change.
+  await mustGit(repoPath, ["add", "-A", "--", ...paths]);
   const staged = await git(repoPath, ["diff", "--cached", "--quiet", "--", ...paths]);
   if (staged.code === 0) {
     log("Nothing to commit.");

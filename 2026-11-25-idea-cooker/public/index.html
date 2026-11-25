@@ -109,7 +109,13 @@
   .composer textarea::placeholder { color: var(--ink-3); }
   .send { width: 36px; height: 36px; padding: 0; border-radius: 8px; }
   .send svg { width: 16px; height: 16px; }
-  .hint { max-width: 680px; margin: 8px auto 0; font-size: 12px; color: var(--ink-3); text-align: center; }
+  .composer-foot { max-width: 680px; margin: 8px auto 0; display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
+  .hint { margin: 0; font-size: 12px; color: var(--ink-3); text-align: center; }
+  .save-only { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+  .save-only input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+  .save-only:has(input:checked) { color: var(--ink); }
+  .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn.danger:hover:not(:disabled) { filter: brightness(.92); }
   .error-line { max-width: 680px; margin: 8px auto 0; font-size: 13px; color: var(--red); }
 
   /* preview panel */
@@ -221,6 +227,7 @@
       <button class="icon-btn only-phone" id="openDrawer" type="button" aria-label="Show ideas"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
       <h1 id="chatTitle">New idea</h1>
       <a class="repo-chip hidden" id="repoChip" target="_blank" rel="noopener"></a>
+      <button class="icon-btn hidden" id="removeBtn" type="button" aria-label="Remove this idea" title="Remove this idea"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v4.5M9.2 6.5v4.5"/></svg></button>
       <button class="btn hidden" id="showPanel" type="button" title="Show the prototype and README"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M9.5 3v10"/></svg>Preview</button>
     </header>
     <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
@@ -231,7 +238,10 @@
         <button class="btn primary send" id="sendBtn" type="submit" aria-label="Send" disabled><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
       </form>
       <p class="error-line hidden" id="chatError" role="alert"></p>
-      <p class="hint" id="hint">Enter to send · Shift+Enter for a new line</p>
+      <div class="composer-foot">
+        <label class="save-only hidden" id="saveOnlyBox" title="Claude writes the README with a 🔴 status and no prototype. You can ask it to build one later."><input type="checkbox" id="saveOnly"> Just save the idea, build it later</label>
+        <p class="hint" id="hint">Enter to send · Shift+Enter for a new line</p>
+      </div>
     </div>
   </section>
 
@@ -275,6 +285,17 @@
     <div class="dlg-foot">
       <button class="btn" value="cancel" formnovalidate>Cancel</button>
       <button class="btn primary" type="button" id="importGo">Link</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="removeDlg" aria-labelledby="removeTitle">
+  <form class="dlg" method="dialog">
+    <h2 id="removeTitle">Remove idea?</h2>
+    <div class="md" id="removeText"></div>
+    <div class="dlg-foot">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn danger" type="button" id="removeGo">Remove</button>
     </div>
   </form>
 </dialog>
@@ -481,11 +502,12 @@ function pendingHtml(p) {
     const s = phase(job);
     const labels = p.kind === "import" ? [["pull", "Pull the latest"], ["write", "Copy the files and write the README"], ["commit", "Commit"], ["push", "Push"]]
       : p.kind === "link" ? [["pull", "Pull the latest"], ["write", "Clone the repo and write the idea's README"], ["commit", "Commit"], ["push", "Push"]]
+      : p.saveOnly ? [["pull", "Pull the latest"], ["write", "Write the README"], ["commit", "Commit"], ["push", "Push"]]
       : COOK_STEPS;
     steps = `<ul class="steps">${labels.map(([k, l]) => `<li class="${s[k]}"><span class="ind"></span>${l}</li>`).join("")}</ul>`;
   }
   const chips = tools.length ? `<div class="tools">${[...new Set(tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
-  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…" }[p.kind] || "Cooking your idea…";
+  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…", remove: "Removing…" }[p.kind] || (p.saveOnly ? "Saving your idea…" : "Cooking your idea…");
   return `${p.userText ? `<div class="msg user">${esc(p.userText)}</div>` : ""}
     <div class="msg assistant"><div class="working"><span class="spinner"></span>${label}</div>${steps}${chips}</div>`;
 }
@@ -507,6 +529,8 @@ function updatePending() {
 function renderChat() {
   const idea = current();
   $("chatTitle").textContent = idea ? titleOf(idea) : ({ import: "Import", link: "Link a repo" })[state.pending?.kind] || "New idea";
+  $("removeBtn").classList.toggle("hidden", !idea || idea.isApp);
+  $("saveOnlyBox").classList.toggle("hidden", !!idea || !ready());
   const chip = $("repoChip");
   chip.classList.toggle("hidden", !idea?.repo);
   if (idea?.repo) {
@@ -525,6 +549,8 @@ function renderChat() {
   if (idea && !state.messages.length && !(state.pending && state.pending.folder === idea.folder)) {
     parts.push(idea.repo
       ? `<div class="msg assistant"><div class="body md"><p>${esc(titleOf(idea))} is linked to <strong>${esc(idea.repo.label)}</strong>. Ask for a change and Claude will edit the code there; each change is committed and pushed to that repo.</p></div></div>`
+      : !idea.entry && idea.status === "red"
+      ? `<div class="msg assistant"><div class="body md"><p>${esc(titleOf(idea))} isn't built yet. When you're ready, ask Claude to “build a first prototype”, or talk the idea through first.</p></div></div>`
       : `<div class="msg assistant"><div class="body md"><p>Ask for a change to ${esc(titleOf(idea))}, like “make it work on phones” or “add a dark mode”, and Claude will edit the prototype and update its README.</p></div></div>`);
   }
   state.messages.forEach((m, i) => parts.push(i >= state.animateFrom ? messageHtml(m).replace('class="msg ', 'class="msg enter ') : messageHtml(m)));
@@ -540,7 +566,7 @@ function renderChat() {
   const t = $("thread");
   t.scrollTop = t.scrollHeight;
 
-  $("input").placeholder = idea ? `Ask for a change to ${titleOf(idea)}…` : "Describe today's idea…";
+  $("input").placeholder = idea ? `Ask for a change to ${titleOf(idea)}…` : $("saveOnly").checked ? "Write down an idea to build later…" : "Describe today's idea…";
   $("input").disabled = !ready();
   updateSend();
 }
@@ -643,7 +669,7 @@ async function poll(jobId, onTick) {
   }
 }
 
-async function runJob(kind, request, userText, folder) {
+async function runJob(kind, request, userText, folder, extra = {}) {
   $("chatError").classList.add("hidden");
   let jobId;
   try {
@@ -652,11 +678,11 @@ async function runJob(kind, request, userText, folder) {
     showError(e.message);
     return null;
   }
-  return follow(jobId, kind, userText, folder);
+  return follow(jobId, kind, userText, folder, extra);
 }
 
-async function follow(jobId, kind, userText, folder) {
-  state.pending = { kind, folder, userText, job: null };
+async function follow(jobId, kind, userText, folder, extra = {}) {
+  state.pending = { kind, folder, userText, job: null, ...extra };
   renderAll();
   const job = await poll(jobId, (j) => {
     state.pending.job = j;
@@ -682,7 +708,7 @@ async function reattach() {
   const kind = j.kind;
   const folder = kind === "cook" || kind === "import" || kind === "link" ? null : j.folder;
   if (kind !== "status" && state.folder !== folder) await select(folder);
-  const job = await follow(id, kind, j.text || "", folder);
+  const job = await follow(id, kind, j.text || "", folder, { saveOnly: !!j.saveOnly });
   if (job.state === "done" && job.result?.folder && !folder) return select(job.result.folder);
   if (state.folder === folder) await loadChat();
   renderAll();
@@ -761,7 +787,8 @@ async function send(force = false) {
   $("input").value = "";
   autosize();
   const folder = state.folder;
-  const job = await runJob(folder ? "revise" : "cook", () => api("POST", "/api/chat", { folder, message: text }), text, folder);
+  const saveOnly = !folder && $("saveOnly").checked;
+  const job = await runJob(folder ? "revise" : "cook", () => api("POST", "/api/chat", { folder, message: text, saveOnly }), text, folder, { saveOnly });
   if (!job) { $("input").value = text; autosize(); updateSend(); return; }
   if (!folder && job.state === "done") return select(job.result.folder);
   if (!folder && job.state !== "done") { $("input").value = text; autosize(); }
@@ -834,6 +861,31 @@ $("threadInner").addEventListener("click", async (e) => {
     state.offer = null;
     await linkRepos(o.links.filter((l) => !l.linkedAs), o.text);
   }
+});
+
+$("saveOnly").addEventListener("change", () => {
+  $("input").placeholder = $("saveOnly").checked ? "Write down an idea to build later…" : "Describe today's idea…";
+  $("input").focus();
+});
+
+/* remove an idea */
+$("removeBtn").addEventListener("click", () => {
+  const idea = current();
+  if (!idea) return;
+  const push = state.config.push && state.config.repo?.remote;
+  $("removeTitle").textContent = `Remove ${titleOf(idea)}?`;
+  $("removeText").innerHTML = `<p>The folder <code>${esc(idea.folder)}</code> is deleted from your ideas repo${push ? " and the change is pushed to GitHub" : ""}, and its chat here is cleared.</p>
+    ${idea.repo ? `<p><strong>${esc(idea.repo.label)}</strong> itself isn't touched; only the link to it is removed.</p>` : ""}
+    <p class="muted">You can get it back from the git history of your ideas repo.</p>`;
+  $("removeDlg").showModal();
+});
+$("removeGo").addEventListener("click", async () => {
+  const idea = current();
+  $("removeDlg").close();
+  if (!idea || state.pending) return;
+  const job = await runJob("remove", () => api("POST", `/api/ideas/${encodeURIComponent(idea.folder)}/remove`), "", idea.folder);
+  if (job?.state === "done") return select(null);
+  renderAll();
 });
 
 /* add an existing project: link (edit the original repo) or copy */

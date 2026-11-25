@@ -156,6 +156,31 @@ try {
   const repoReadme = await api("GET", `/api/ideas/${linked}/readme?which=repo`);
   ok(/counter|reset/i.test(repoReadme.text), "panel can show the linked repo's own README");
 
+  // --- save an idea without building it
+  job = await waitJob((await api("POST", "/api/chat", { message: "A mug that tells you when your coffee is drinkable", saveOnly: true })).jobId);
+  printLog(job);
+  ok(job.state === "done" && job.result.pushed, `save-only idea pushed (${job.error || job.result.folder})`);
+  const saved = job.result.folder;
+  const savedFiles = await must(remote, ["ls-tree", "-r", "--name-only", "main", saved]);
+  ok(savedFiles.trim() === `${saved}/README.md`, "save-only idea has only a README");
+  ideas = await api("GET", "/api/ideas");
+  ok(ideas.find((i) => i.folder === saved)?.status === "red", "save-only idea is 🔴");
+
+  // --- remove ideas (a plain one and a linked one)
+  job = await waitJob((await api("POST", `/api/ideas/${saved}/remove`)).jobId);
+  ok(job.state === "done" && job.result.pushed, `removed ${saved} and pushed (${job.error || "ok"})`);
+  ok(!(await must(remote, ["ls-tree", "--name-only", "main"])).includes(saved), "removed idea is gone from the remote");
+  ok((await must(remote, ["log", "-1", "--format=%s", "main"])) === `Remove idea: ${saved}`, "removal has its own commit");
+  const extBefore = await must(extBare, ["rev-parse", "main"]);
+  job = await waitJob((await api("POST", `/api/ideas/${linked}/remove`)).jobId);
+  ok(job.state === "done", `removed linked idea ${linked}`);
+  ok((await must(extBare, ["rev-parse", "main"])) === extBefore, "the linked repo itself was not changed");
+  ideas = await api("GET", "/api/ideas");
+  ok(!ideas.some((i) => i.folder === saved || i.folder === linked), "removed ideas are no longer listed");
+  ok((await api("GET", `/api/chat/${linked}`)).messages.length === 0, "removed idea's chat is cleared");
+  const gone = await fetch(`${base}/api/ideas/${saved}/remove`, { method: "POST" });
+  ok(gone.status === 404, "removing a missing idea gives 404");
+
   // --- status light
   const s = await waitJob((await api("POST", `/api/ideas/${folder}/status`, { status: "green" })).jobId);
   ok(s.state === "done" && s.result.pushed, "status change committed and pushed");
