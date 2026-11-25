@@ -17,7 +17,30 @@ const README_FORMAT = (date) => `an H1 title with an emoji or two, a one-line \`
 
 const STATUS_RULE = `The "## Status" section must start with exactly one traffic light and a bold label, then one sentence: "🔴 **Idea.**" (nothing runs yet), "🟡 **Prototype.**" (works, with clear gaps) or "🟢 **Done.**".`;
 
-const RULES = `Do not run any shell commands and do not use git; the app that called you commits and pushes.`;
+// Placeholders that runClaude fills in, depending on whether the user lets Claude run commands.
+const RULES = "{{RULES}}";
+const CHECKS = "{{CHECKS}}";
+const RULES_NO_SHELL = `Do not run any shell commands and do not use git; the app that called you commits and pushes.`;
+const RULES_SHELL = `You may run shell commands inside the project folder to check your work: run its tests, run scripts, or start a local server in the background (run_in_background) and request it with curl or node. Stop every background process you started before you finish. Don't use git (the app commits and pushes), don't install anything globally, and don't touch files outside the project.`;
+const CHECKS_NO_SHELL = `You can't run commands, so you can't run the tests or the app. Read the code carefully instead, and say what the user should run to check your change.`;
+const CHECKS_SHELL = `Check your change by running it: run the project's tests (install dependencies first if needed, e.g. npm install), and if it has a local server or test site, start it in the background, request its pages, then stop it. Tell the user what you ran and what passed or failed, and what they still need to try by hand (for example a browser extension in their browser).`;
+
+/** Commands Claude may never run, even with commands allowed. This is a guard, not a sandbox. */
+const BLOCKED_COMMANDS = [
+  [/\bgit\s+(push|commit|reset|clean|checkout|switch|rebase|merge|remote|config|tag|stash|rm|mv|restore|filter-branch|gc)\b/i, "git is handled by the app"],
+  [/\b(npm|pnpm|yarn|bun)\s+(publish|unpublish|adduser|login|logout|token|owner)\b/i, "publishing and logins are off-limits"],
+  [/\b(npm|pnpm|yarn|bun)\s+(i|install|add)\b[^&|;]*\s(-g|--global)\b/i, "no global installs"],
+  [/\bsudo\b|\brunas\b|\bshutdown\b|\bRestart-Computer\b|\bStop-Computer\b|\bformat\s+[a-z]:/i, "system commands are off-limits"],
+  [/\brm\s+-[a-z]*r[a-z]*\s+(-[a-z]+\s+)*["']?(\/|~|\$HOME|[a-z]:|\.\.)/i, "recursive deletes outside the project"],
+  [/\bRemove-Item\b[^|;&]*-Recurse|\brmdir\s+\/s\b|\bdel\s+\/s\b/i, "recursive deletes"],
+  [/\b(curl|wget|iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^|]*\|\s*(sh|bash|zsh|iex|Invoke-Expression|powershell|pwsh)\b/i, "piping downloads into a shell"],
+  [/\breg(\.exe)?\s+(add|delete|import)\b|\bsetx\b|\bSet-ItemProperty\b[^|]*HK(LM|CU)/i, "registry and system settings"],
+  [/\b(ssh|scp)\s|\.ssh[\\/]|credential|\.git-credentials/i, "credentials and remote shells"],
+];
+export function blockedCommand(cmd) {
+  for (const [re, why] of BLOCKED_COMMANDS) if (re.test(String(cmd))) return why;
+  return null;
+}
 
 async function example() {
   return fs.readFile(EXAMPLE_README, "utf8");
@@ -42,9 +65,12 @@ export function rulesBlock(rules = []) {
     .join("\n")}`;
 }
 
-async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules = [], log, emit }) {
-  const prompt = basePrompt + rulesBlock(rules);
+async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules = [], allowCommands = false, log, emit }) {
+  const prompt = (basePrompt + rulesBlock(rules))
+    .replaceAll(RULES, allowCommands ? RULES_SHELL : RULES_NO_SHELL)
+    .replaceAll(CHECKS, allowCommands ? CHECKS_SHELL : CHECKS_NO_SHELL);
   if (rules.length) log(`Rules: ${rules.map((r) => r.title || "untitled").join(", ")}`);
+  if (allowCommands) log("Commands: allowed");
   const folderRe = scope.type === "new" ? new RegExp(`^${scope.date}-[a-z0-9][a-z0-9-]{0,60}$`) : null;
   let chosen = scope.type === "folder" ? scope.folder : null;
   // A linked repo's clone (scope.clone) becomes the working directory; the ideas repo is added next to it.
@@ -90,6 +116,22 @@ async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules
       emit({ kind: "tool", text: `${toolName === "Write" ? "Wrote" : "Edited"} ${shown}` });
       return { behavior: "allow", updatedInput: input };
     }
+    if (allowCommands && (toolName === "Bash" || toolName === "PowerShell")) {
+      const cmd = String(input.command || "");
+      const why = blockedCommand(cmd);
+      if (why) {
+        log(`Blocked command (${why}): ${cmd.slice(0, 200)}`);
+        return { behavior: "deny", message: `Not allowed here: ${why}.` };
+      }
+      const short = cmd.replace(/\s+/g, " ").trim();
+      log(`Run ${short.slice(0, 300)}${input.run_in_background ? " (background)" : ""}`);
+      emit({ kind: "tool", text: `Ran ${short.length > 70 ? short.slice(0, 67) + "…" : short}${input.run_in_background ? " (background)" : ""}` });
+      return { behavior: "allow", updatedInput: input };
+    }
+    // Reading the output of, or stopping, a background command Claude started.
+    if (allowCommands && /^(TaskStop|TaskOutput|BashOutput|KillShell|KillBash|Monitor)$/.test(toolName)) {
+      return { behavior: "allow", updatedInput: input };
+    }
     return { behavior: "deny", message: `${toolName} isn't available here. Use Read, Glob, Grep, Write and Edit only.` };
   };
 
@@ -104,9 +146,9 @@ async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules
         ...(clone ? { additionalDirectories: [root] } : {}),
         model: model || undefined,
         allowedTools: [],
-        disallowedTools: ["Bash", "PowerShell", "WebFetch", "WebSearch", "Task", "Agent"],
+        disallowedTools: allowCommands ? ["WebFetch", "WebSearch", "Task", "Agent"] : ["Bash", "PowerShell", "WebFetch", "WebSearch", "Task", "Agent"],
         canUseTool,
-        maxTurns: 40,
+        maxTurns: allowCommands ? 80 : 40,
         ...(resumeId ? { resume: resumeId } : {}),
       },
     })) {
@@ -146,7 +188,7 @@ async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules
 }
 
 /** New idea: Claude creates `<today>-<slug>/` with README + prototype. */
-export async function cookIdea({ repoPath, idea, model, rules = [], log, emit = () => {}, saveOnly = false }) {
+export async function cookIdea({ repoPath, idea, model, rules = [], allowCommands = false, log, emit = () => {}, saveOnly = false }) {
   const root = path.resolve(repoPath);
   const date = today();
   const existing = await topFolders(root);
@@ -174,7 +216,7 @@ Example README (it has a prototype; yours won't):
 <example_readme>
 ${await example()}
 </example_readme>`;
-    const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, rules, log, emit });
+    const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, rules, allowCommands, log, emit });
     if (!r.folder) throw new Error("Claude didn't write any files.");
     return r;
   }
@@ -202,7 +244,7 @@ Here is the README of an earlier idea, as the example of format and tone:
 ${await example()}
 </example_readme>`;
 
-  const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, rules, log, emit });
+  const r = await runClaude({ root, prompt, scope: { type: "new", date, existingLower }, model, rules, allowCommands, log, emit });
   if (!r.folder) throw new Error("Claude didn't write any files.");
   await fs.access(path.join(root, r.folder, "README.md")).catch(() => {
     throw new Error(`${r.folder}/README.md is missing.`);
@@ -211,7 +253,7 @@ ${await example()}
 }
 
 /** Follow-up: Claude changes an existing idea, only inside its folder. */
-export async function reviseIdea({ repoPath, folder, message, sessionId, model, rules = [], log, emit = () => {}, clone = null, cloneLabel = "" }) {
+export async function reviseIdea({ repoPath, folder, message, sessionId, model, rules = [], allowCommands = false, log, emit = () => {}, clone = null, cloneLabel = "" }) {
   const root = path.resolve(repoPath);
   if (FAKE()) return fakeRevise({ root, folder, message, log, emit, clone, cloneLabel });
   if (clone) {
@@ -227,14 +269,14 @@ ${message}
 
 Rules:
 - Make code changes in the project (your working directory). Keep changes focused on the request and match the project's existing style.
-- You can't run commands, so you can't run the tests or the app. Read the code carefully instead, and say what the user should run to check your change.
+- ${CHECKS}
 - If the change affects what the idea notes say (what works, status, next steps), update \`${ideaDir}${path.sep}README.md\` too. Keep its format. ${STATUS_RULE}
 - Don't change anything else in the ideas repository.
 - If the request is only a question, answer it and don't change files.
 - ${RULES} The app commits your changes to ${cloneLabel} and pushes them.
 
 Reply in 1-4 short sentences: what you changed (or the answer), and how to check it.`;
-    return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: true }, resume: sessionId, model, rules, log, emit });
+    return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: true }, resume: sessionId, model, rules, allowCommands, log, emit });
   }
   const prompt = `You're working on one idea in the user's daily-ideas git repository (your current working directory). The idea lives in the folder \`${folder}/\`. If you haven't seen its files in this conversation yet, read its README.md and prototype first.
 
@@ -250,11 +292,11 @@ Make the change. Rules:
 - ${RULES}
 
 Reply in 1-3 short sentences: what you changed (or the answer). The user sees the updated prototype next to your reply.`;
-  return runClaude({ root, prompt, scope: { type: "folder", folder }, resume: sessionId, model, rules, log, emit });
+  return runClaude({ root, prompt, scope: { type: "folder", folder }, resume: sessionId, model, rules, allowCommands, log, emit });
 }
 
 /** Import: files are already copied into `folder`; Claude writes the idea README from the code. */
-export async function describeImport({ repoPath, folder, source, date, model, rules = [], log, emit = () => {} }) {
+export async function describeImport({ repoPath, folder, source, date, model, rules = [], allowCommands = false, log, emit = () => {} }) {
   const root = path.resolve(repoPath);
   if (FAKE()) return fakeDescribe({ root, folder, source, date, log, emit });
   const prompt = `The folder \`${folder}/\` in the user's daily-ideas git repository (your current working directory) was just imported from ${source}. It's an idea the user prototyped before they started using this app.
@@ -273,11 +315,11 @@ Example README:
 <example_readme>
 ${await example()}
 </example_readme>`;
-  return runClaude({ root, prompt, scope: { type: "folder", folder }, model, rules, log, emit });
+  return runClaude({ root, prompt, scope: { type: "folder", folder }, model, rules, allowCommands, log, emit });
 }
 
 /** Linked repo: Claude reads the clone and writes the idea README in the ideas repo. The clone isn't changed. */
-export async function describeLinked({ repoPath, folder, clone, cloneLabel, date, model, rules = [], log, emit = () => {} }) {
+export async function describeLinked({ repoPath, folder, clone, cloneLabel, date, model, rules = [], allowCommands = false, log, emit = () => {} }) {
   const root = path.resolve(repoPath);
   if (FAKE()) return fakeDescribe({ root, folder, source: cloneLabel, date, log, emit, linked: true });
   const ideaReadme = path.join(root, folder, "README.md");
@@ -297,7 +339,7 @@ Example README:
 <example_readme>
 ${await example()}
 </example_readme>`;
-  return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: false }, model, rules, log, emit });
+  return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: false }, model, rules, allowCommands, log, emit });
 }
 
 /* ---------- test doubles: IDEA_COOKER_FAKE=1 skips Claude ---------- */

@@ -329,6 +329,10 @@
     </div>
     <label class="check"><input type="checkbox" id="pushBox"> Push to GitHub after each commit</label>
     <div class="field">
+      <label class="check"><input type="checkbox" id="cmdBox"> Let Claude run commands</label>
+      <p class="hint2">Claude can then run tests and scripts and start local servers (like a test site) to check its own work, in the idea's folder or linked repo. This runs code on this PC. Git, publishing, global installs and system commands stay blocked, and the app still does all commits and pushes.</p>
+    </div>
+    <div class="field">
       <label for="modelBox">Model</label>
       <input type="text" id="modelBox" placeholder="Claude Code default" spellcheck="false" autocomplete="off">
       <p class="hint2">A model ID such as <code>claude-opus-5-5</code>. Leave empty for the default.</p>
@@ -989,6 +993,7 @@ function openSettings() {
   renderRules(c.rules);
   $("repoPath").value = c.repoPath || "";
   $("pushBox").checked = c.push !== false;
+  $("cmdBox").checked = !!c.allowCommands;
   $("modelBox").value = c.model || "";
   $("repoFacts").classList.add("hidden");
   $("repoError").classList.add("hidden");
@@ -1024,7 +1029,7 @@ $("checkBtn").addEventListener("click", checkRepo);
 $("repoPath").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkRepo(); } });
 $("saveBtn").addEventListener("click", async () => {
   const p = $("repoPath").value.trim();
-  const body = { push: $("pushBox").checked, model: $("modelBox").value, rules: collectRules() };
+  const body = { push: $("pushBox").checked, model: $("modelBox").value, rules: collectRules(), allowCommands: $("cmdBox").checked };
   if (p && (p !== state.config.repoPath || !state.config.confirmed)) {
     if (checkedPath !== p && !(await checkRepo())) return;
     body.repoPath = p;

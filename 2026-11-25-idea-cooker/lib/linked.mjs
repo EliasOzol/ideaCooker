@@ -74,7 +74,20 @@ export async function ensureClone(reposDir, repoInput, log) {
       if (r.code !== 0) throw new Error(`Couldn't update the clone of ${repo.label} (${dir}): ${r.stderr || r.stdout}`);
     }
   }
+  await excludeRunLeftovers(dir);
   return dir;
+}
+
+// Files that running a project creates. Excluded locally (.git/info/exclude), so they're never
+// committed to the user's repo, without changing the repo's own .gitignore.
+const LEFTOVERS = ["node_modules/", ".venv/", "venv/", "__pycache__/", "*.pyc", "coverage/", ".nyc_output/", "*.log", ".DS_Store", "Thumbs.db"];
+async function excludeRunLeftovers(dir) {
+  const file = path.join(dir, ".git", "info", "exclude");
+  const current = await fs.readFile(file, "utf8").catch(() => "");
+  const missing = LEFTOVERS.filter((l) => !current.split(/\r?\n/).includes(l));
+  if (!missing.length) return;
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.appendFile(file, `${current.endsWith("\n") || !current ? "" : "\n"}# added by Idea Cooker: files that running the project creates\n${missing.join("\n")}\n`);
 }
 
 export async function firstCommitDate(dir) {

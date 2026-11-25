@@ -68,7 +68,7 @@ That runs the whole flow (cook, follow-up, import, change status, with a push af
 - [x] Chat to improve an existing idea's prototype
 - [x] Import ideas built before the app, from a repo link or folder
 - [x] Link existing repos so Claude can edit them and push there
-- [ ] Let Claude run a project's tests (`npm test`) in linked repos, so it can check its own changes
+- [x] Let Claude run commands (tests, scripts, local servers) to check its own work; opt-in in Settings, with git, publishing, global installs and system commands blocked
 - [x] Rule sets in Settings (a headline plus rules) that Claude follows in everything it builds
 - [x] Remove ideas, and save ideas to build later
 - [ ] Show in the page whether Claude Code is logged in, before you cook
