@@ -1,50 +1,48 @@
-# 🍳🔐 Follow-up: recipeRemix & Passrotor
+# 🔐🔄 Passrotor: the follow-up
 
-> No new idea today. Today I finish two old ones, by talking them through with Claude.
+> Picking an older project back up and taking it further.
 
 **Daily idea · 2026-11-25**
 
 ## The idea
 
-Today's idea is to follow up on two older projects instead of starting a new one:
+Follow up on my existing project [**Passrotor**](https://github.com/EliasOzol/Passrotor) and decide what the next version should be.
 
-- [**recipeRemix**](https://github.com/EliasOzol/recipeRemix): I already have a clear list of changes. I want a consultant-style talk with Claude to turn them into a plan, then get it finished.
-- [**Passrotor**](https://github.com/EliasOzol/Passrotor): needs the same kind of follow-up.
+(recipeRemix gets its own, separate daily idea later.)
 
-The consulting happens in the chat with Claude, not through a separate app. The talk should cover:
+What Passrotor is and does today: _to be filled in from the talk with Claude, since Claude can't open the repo from here._
 
-1. **Snapshot**: what does the project do today?
-2. **Definition of done**: who uses it, and what can they do then that they can't do today?
-3. **Changes**: the list of changes, each rated by how important it is and how much work it takes.
-4. **Risk**: the part I'm least sure how to build gets tried out first.
-5. **Plan**: an order of work that fits the time I actually have. Everything else goes to "later".
+Questions for the talk:
+
+1. What does Passrotor do today, and who is it for?
+2. What do I like most about it, and what bugs me?
+3. What would make it clearly better: one new feature, a redesign, or a finished v1?
+4. What's the smallest version of that which could run as a prototype in this folder?
 
 ## Why
 
-- Old repos stall because "finished" was never defined, not because the code is hard.
-- A list of changes without priorities and a time budget is just a wishlist.
-- A conversation that asks the annoying questions forces the decisions I've been avoiding.
+- Passrotor is the one of my two older projects that I find most promising, so it goes first.
+- Following up on something that already exists beats starting yet another new idea.
 
 ## The prototype
 
-No app for this one. I first built a scripted "consultant" web app (FinishLine), but removed it: the consulting should be a real conversation with Claude, not a fixed script. The result of each talk will be written down here as a plan.
+Nothing yet. `index.html` is a placeholder with a link to the repo. Once we've talked through what Passrotor is and what the next step should be, the prototype of that next step goes here.
 
 ### Run it
 
-Nothing to run. Open the chat and start the consultation, for example:
-
 ```powershell
-start README.md
+start index.html
 ```
 
 ## Status
 
-🔴 **Idea.** The consultant app has been removed, and the recipeRemix and Passrotor talks with Claude haven't happened yet.
+🔴 **Idea.** Passrotor is chosen as the project to follow up on, but the next step hasn't been defined or built yet.
 
 ## Next steps
 
+- [x] Split recipeRemix and Passrotor into separate ideas, starting with Passrotor
 - [x] Remove the scripted FinishLine consultant app
-- [ ] Talk through recipeRemix with Claude: snapshot, definition of done, changes, plan
-- [ ] Write the recipeRemix plan here and as `FINISH.md` in its repo
-- [ ] Do the same for Passrotor
-- [ ] Work through the recipeRemix plan in the repo itself
+- [ ] Explain to Claude what Passrotor does today
+- [ ] Decide the next feature or change for Passrotor
+- [ ] Build a small prototype of it in this folder
+- [ ] Give recipeRemix its own daily idea
