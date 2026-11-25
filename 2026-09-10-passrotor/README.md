@@ -39,7 +39,7 @@ The repository root is an unpacked Manifest V3 extension (Brave, Chrome, Edge):
 - **− / +** buttons step the counter by hand to fix drift.
 - [`kdf.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.js): PBKDF2-SHA256 (250,000 iterations, salt `domain:counter`), domain normalization and a 20-character password with lowercase, uppercase, digit and symbol.
 - [`rotation-store.js`](https://github.com/EliasOzol/Passrotor/blob/main/rotation-store.js): per-site counters, now using the same domain normalization as `kdf.js`. The popup saves them to `chrome.storage.sync`.
-- [`test-site/server.js`](https://github.com/EliasOzol/Passrotor/blob/main/test-site/server.js): a fake website with no dependencies (register, login, two change-password forms: one well labelled, one with meaningless field names). The account page shows the stored password, so you can see what Passrotor did without risking a real account.
+- [`test-site/server.js`](https://github.com/EliasOzol/Passrotor/blob/main/test-site/server.js): a fake website with no dependencies (register, login, two change-password forms: one well labelled, one with meaningless field names). The account page shows the stored password, so you can see what Passrotor did without risking a real account. [`test-site/smoke.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/test-site/smoke.test.js) starts it and runs the whole flow over HTTP with real derived passwords: register, log in, rotate twice, and check that the old password is rejected.
 - Tests: [`kdf.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.test.js) and [`rotation-store.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/rotation-store.test.js), run with `npm test`.
 
 ### Run it
@@ -47,7 +47,7 @@ The repository root is an unpacked Manifest V3 extension (Brave, Chrome, Edge):
 ```powershell
 git clone https://github.com/EliasOzol/Passrotor.git
 cd Passrotor
-npm test                      # Node 19+
+npm test                      # Node 19+, includes the test-site smoke test
 npm run test-site             # fake website on http://localhost:8080
 ```
 
