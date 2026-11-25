@@ -168,13 +168,10 @@
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
   /* narrow screens: sidebar is a drawer, panel is a full-screen sheet */
-  .only-narrow { display: none; }
   .only-phone { display: none !important; }
   @media (max-width: 1100px) {
     .app.with-panel { grid-template-columns: var(--sidebar) minmax(0, 1fr); }
     .app.with-panel .panel { position: fixed; inset: 0 0 0 auto; width: min(720px, 100vw); z-index: 20; box-shadow: -16px 0 48px rgb(0 0 0 / .15); }
-    .app.with-panel.panel-closed .panel { display: none; }
-    .only-narrow { display: inline-grid; }
   }
   @media (max-width: 720px) {
     .app, .app.with-panel { grid-template-columns: minmax(0, 1fr); }
@@ -210,7 +207,7 @@
     <header class="chat-head">
       <button class="icon-btn only-phone" id="openDrawer" type="button" aria-label="Show ideas"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
       <h1 id="chatTitle">New idea</h1>
-      <button class="btn ghost only-narrow hidden" id="showPanel" type="button">Preview</button>
+      <button class="btn hidden" id="showPanel" type="button" title="Show the prototype and README"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M9.5 3v10"/></svg>Preview</button>
     </header>
     <div class="thread" id="thread"><div class="thread-inner" id="threadInner"></div></div>
     <div class="composer">
@@ -234,7 +231,7 @@
       <label class="status" id="statusBox"><span class="dot" id="statusDot"></span><select id="statusSel" aria-label="Status"></select></label>
       <button class="icon-btn" id="reloadBtn" type="button" aria-label="Reload preview" title="Reload"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.8h-2.8"/></svg></button>
       <a class="icon-btn" id="openTab" target="_blank" rel="noopener" aria-label="Open in a new tab" title="Open in a new tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V13H3V5h3.5"/></svg></a>
-      <button class="icon-btn only-narrow" id="hidePanel" type="button" aria-label="Close preview"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      <button class="icon-btn" id="hidePanel" type="button" aria-label="Close preview" title="Close (Esc)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </header>
     <div class="panel-body" id="panelBody"></div>
   </section>
@@ -292,6 +289,20 @@ const $ = (id) => document.getElementById(id);
 const LABELS = { red: "Idea", yellow: "Prototype", green: "Done" };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/* The preview stays open or closed as you left it (closed by default on small screens). */
+function loadPanelPref() {
+  try {
+    const v = localStorage.getItem("ideaCooker.panelOpen");
+    if (v !== null) return v === "1";
+  } catch {}
+  return window.innerWidth > 1100;
+}
+function setPanel(open) {
+  state.panelOpen = open;
+  try { localStorage.setItem("ideaCooker.panelOpen", open ? "1" : "0"); } catch {}
+  renderPanel();
+}
+
 const state = {
   config: null,
   ideas: [],
@@ -301,7 +312,7 @@ const state = {
   pending: null,         // { kind, folder, userText, job } while Claude works
   tab: "proto",
   previewVersion: Date.now(),
-  panelOpen: true,
+  panelOpen: loadPanelPref(),
   animateFrom: Infinity, // messages at or after this index fade in on the next render
 };
 
@@ -482,7 +493,7 @@ function renderChat() {
     parts.push(`<div class="welcome"><h2>${esc(new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }))}</h2><p>${esc(sub)}</p></div>`);
   }
   if (idea && !state.messages.length && !(state.pending && state.pending.folder === idea.folder)) {
-    parts.push(`<div class="msg assistant"><div class="body md"><p>${esc(titleOf(idea))} is open on the right. Ask for a change, like “make it work on phones” or “add a dark mode”, and Claude will edit the prototype and update its README.</p></div></div>`);
+    parts.push(`<div class="msg assistant"><div class="body md"><p>Ask for a change to ${esc(titleOf(idea))}, like “make it work on phones” or “add a dark mode”, and Claude will edit the prototype and update its README.</p></div></div>`);
   }
   state.messages.forEach((m, i) => parts.push(i >= state.animateFrom ? messageHtml(m).replace('class="msg ', 'class="msg enter ') : messageHtml(m)));
   state.animateFrom = Infinity;
@@ -509,11 +520,17 @@ function updateSend() {
 function renderPanel() {
   const idea = current();
   const app = $("app");
-  app.classList.toggle("with-panel", !!idea);
-  app.classList.toggle("panel-closed", !state.panelOpen);
-  $("panel").classList.toggle("hidden", !idea);
-  $("showPanel").classList.toggle("hidden", !idea);
-  if (!idea) return;
+  const open = !!idea && state.panelOpen;
+  app.classList.toggle("with-panel", open);
+  $("panel").classList.toggle("hidden", !open);
+  $("showPanel").classList.toggle("hidden", !idea || open);
+  if (!open) {
+    // Closing unloads the prototype, like closing a window.
+    const body = $("panelBody");
+    body.innerHTML = "";
+    delete body.dataset.readme;
+    return;
+  }
 
   const hasProto = !!idea.entry;
   if (!hasProto && state.tab === "proto") state.tab = "readme";
@@ -566,7 +583,6 @@ function renderAll() {
 async function select(folder) {
   state.folder = folder || null;
   state.tab = "proto";
-  state.panelOpen = true;
   $("chatError").classList.add("hidden");
   $("app").classList.remove("drawer");
   const h = folder ? `#/${folder}` : "#/";
@@ -609,8 +625,10 @@ async function follow(jobId, kind, userText, folder) {
   state.pending = null;
   state.animateFrom = state.messages.length;
   await loadIdeas();
-  if (job.state === "done") state.previewVersion = Date.now();
-  else showError(job.error || "Something went wrong.");
+  if (job.state === "done") {
+    state.previewVersion = Date.now();
+    if (kind !== "status") state.panelOpen = true; // show what changed, like a chat app opening its canvas
+  } else showError(job.error || "Something went wrong.");
   return job;
 }
 
@@ -673,8 +691,11 @@ $("filters").addEventListener("click", (e) => {
 $("newBtn").addEventListener("click", () => select(null));
 $("openDrawer").addEventListener("click", () => $("app").classList.add("drawer"));
 $("closeDrawer").addEventListener("click", () => $("app").classList.remove("drawer"));
-$("showPanel").addEventListener("click", () => { state.panelOpen = true; renderPanel(); });
-$("hidePanel").addEventListener("click", () => { state.panelOpen = false; renderPanel(); });
+$("showPanel").addEventListener("click", () => setPanel(true));
+$("hidePanel").addEventListener("click", () => setPanel(false));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && state.panelOpen && current() && !document.querySelector("dialog[open]")) setPanel(false);
+});
 
 $("tabProto").addEventListener("click", () => { state.tab = "proto"; renderPanel(); });
 $("tabReadme").addEventListener("click", () => { state.tab = "readme"; renderPanel(); });
