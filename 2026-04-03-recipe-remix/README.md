@@ -32,7 +32,7 @@ It has three tabs:
 - **Remix:** scale by **Personer** or **Ingrediens**, and edit title, ingredients, steps and notes inline. Ingredients without a number ("salt og peber", "Zest of 1 Orange") are not scaled.
 - **Favoritter:** saved recipes in `localStorage`. While a recipe is a favourite, every edit is saved to it automatically.
 
-No tests. `npm run lint` and `npm run build` both pass.
+`npm run build` writes a static copy to [`docs/`](https://github.com/EliasOzol/recipeRemix/tree/main/docs), which is committed and is what the Prototype tab opens. No tests. `npm run lint` and `npm run build` both pass.
 
 ### Run it
 
@@ -59,3 +59,5 @@ Search needs internet access. Link import also depends on public CORS proxies be
 - [ ] Add tests for `parseIngredient`, `mealToRecipe` and the scaling functions
 - [ ] Use a small backend or serverless function for link import, instead of public CORS proxies
 - [ ] Sync favourites between devices
+- [ ] Publish `docs/` with GitHub Pages
+- [ ] Rebuild `docs/` automatically (pre-commit hook or GitHub Action) so it can't fall behind the source
