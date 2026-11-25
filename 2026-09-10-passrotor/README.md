@@ -31,6 +31,8 @@ The catch: unlike TOTP, the website has no rotor of its own. Before the counter 
 
 ## The prototype
 
+[`docs/index.html`](https://github.com/EliasOzol/Passrotor/blob/main/docs/index.html) is a playground you can try without installing anything (it's what the Prototype tab shows). It runs the real `kdf.js` and `rotation-store.js` against a simulated website: sign up, log in, rotate in two steps, watch the old password get rejected, and fix drift with − / +.
+
 The repository root is an unpacked Manifest V3 extension (Brave, Chrome, Edge):
 
 - [`manifest.json`](https://github.com/EliasOzol/Passrotor/blob/main/manifest.json): permissions `activeTab`, `scripting` and `storage`, no background script.
@@ -60,6 +62,7 @@ In Brave, open `brave://extensions`, turn on **Developer mode**, click **Load un
 ## Next steps
 
 - [x] A local test site to try the full register → login → rotate flow safely
+- [x] An in-browser playground (`docs/index.html`) so the idea can be tried without the extension
 
 - [x] Fix the README merge-conflict markers
 - [x] Fix the test import and add `npm test`
