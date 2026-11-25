@@ -31,7 +31,7 @@ The catch: unlike TOTP, the website has no rotor of its own. Before the counter 
 
 ## The prototype
 
-The repository root is an unpacked Manifest V3 extension (Chrome/Edge):
+The repository root is an unpacked Manifest V3 extension (Brave, Chrome, Edge):
 
 - [`manifest.json`](https://github.com/EliasOzol/Passrotor/blob/main/manifest.json): permissions `activeTab`, `scripting` and `storage`, no background script.
 - [`popup.html`](https://github.com/EliasOzol/Passrotor/blob/main/popup.html) / [`popup.js`](https://github.com/EliasOzol/Passrotor/blob/main/popup.js): picks up the site from the open tab, takes the master password, and offers **Fill login** (fills visible password fields, only if the site matches the tab), **Copy** and **Show**.
@@ -39,6 +39,7 @@ The repository root is an unpacked Manifest V3 extension (Chrome/Edge):
 - **− / +** buttons step the counter by hand to fix drift.
 - [`kdf.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.js): PBKDF2-SHA256 (250,000 iterations, salt `domain:counter`), domain normalization and a 20-character password with lowercase, uppercase, digit and symbol.
 - [`rotation-store.js`](https://github.com/EliasOzol/Passrotor/blob/main/rotation-store.js): per-site counters, now using the same domain normalization as `kdf.js`. The popup saves them to `chrome.storage.sync`.
+- [`test-site/server.js`](https://github.com/EliasOzol/Passrotor/blob/main/test-site/server.js): a fake website with no dependencies (register, login, two change-password forms: one well labelled, one with meaningless field names). The account page shows the stored password, so you can see what Passrotor did without risking a real account.
 - Tests: [`kdf.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/kdf.test.js) and [`rotation-store.test.js`](https://github.com/EliasOzol/Passrotor/blob/main/rotation-store.test.js), run with `npm test`.
 
 ### Run it
@@ -47,16 +48,18 @@ The repository root is an unpacked Manifest V3 extension (Chrome/Edge):
 git clone https://github.com/EliasOzol/Passrotor.git
 cd Passrotor
 npm test                      # Node 19+
-start chrome chrome://extensions
+npm run test-site             # fake website on http://localhost:8080
 ```
 
-Turn on **Developer mode**, click **Load unpacked**, pick the `Passrotor` folder, then open any website and click the Passrotor icon.
+In Brave, open `brave://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the `Passrotor` folder. Then open <http://localhost:8080>. Register and log in with **Fill login**, then rotate on *Change password* with **Fill change form** → submit → **It worked**.
 
 ## Status
 
-🟡 **Prototype.** The extension derives, fills, copies and rotates passwords with a manual confirm step, but rotation isn't automatic yet and it hasn't been tested against real sites.
+🟡 **Prototype.** The extension derives, fills, copies and rotates passwords with a manual confirm step, but rotation isn't automatic yet and it hasn't been tried on real sites yet.
 
 ## Next steps
+
+- [x] A local test site to try the full register → login → rotate flow safely
 
 - [x] Fix the README merge-conflict markers
 - [x] Fix the test import and add `npm test`
