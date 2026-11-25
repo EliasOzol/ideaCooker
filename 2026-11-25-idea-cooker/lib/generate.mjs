@@ -22,7 +22,7 @@ ${idea}
 
 Do this:
 1. Pick a short, catchy name for the idea and a kebab-case slug (2-4 words, lowercase a-z, 0-9 and hyphens).
-2. Create exactly ONE new folder in the repository root named \`${date}-<slug>\`. Write files only inside that folder. These folders already exist, so do not use or touch them: ${existing.length ? existing.join(", ") : "(none)"}. (The repo root also holds the Idea Cooker app itself; ignore its code.)
+2. Create exactly ONE new folder in the repository root named \`${date}-<slug>\`. Write files only inside that folder. These folders already exist, so do not use or touch them: ${existing.length ? existing.join(", ") : "(none)"}. (One of them holds the Idea Cooker app that is running you; ignore its code.)
 3. Write \`README.md\` in that folder, following the example below: an H1 title with an emoji or two, a one-line \`>\` tagline, a "**Daily idea · ${date}**" line, then the sections "## The idea", "## Why", "## The prototype" (with a "### Run it" subsection giving a PowerShell command), "## Status" and "## Next steps" (a checklist). Write in English.
 4. The "## Status" section must start with exactly one traffic light and a bold label, then one sentence: "🔴 **Idea.**" (nothing runs yet), "🟡 **Prototype.**" (a working prototype with clear gaps) or "🟢 **Done.**". A freshly built prototype is normally 🟡.
 5. Build a small prototype that actually works. Prefer a single self-contained \`index.html\` (inline CSS and JS, no build step, no external network calls unless the idea needs them) that opens by double-clicking. If the idea really needs something else (a Python script, an Arduino sketch, a CLI), keep it to a few files with no install step where possible, and explain how to run it in the README.
