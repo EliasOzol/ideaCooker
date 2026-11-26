@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Then &amp; Now</title>
+<style>
+  :root {
+    --bg: #f6f1e9;
+    --surface: #fffdf8;
+    --ink: #2b2622;
+    --muted: #7a7068;
+    --faint: #c9bdb0;
+    --line: #e4dacd;
+    --accent: #a94b28;
+    --accent-hover: #8f3d1f;
+    --accent-ink: #fffdf8;
+    --memory: #efe5d6;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1815;
+      --surface: #23201c;
+      --ink: #ece4d8;
+      --muted: #a39888;
+      --faint: #4d443b;
+      --line: #362f29;
+      --accent: #e08a62;
+      --accent-hover: #eba07c;
+      --accent-ink: #1b1815;
+      --memory: #2a2420;
+    }
+  }
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/24px var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 600px; margin: 0 auto; padding: 48px 24px 64px; }
+
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 48px; }
+  .mark { font: 600 18px/24px var(--serif); }
+  .date { text-align: right; }
+  .date time { display: block; font-size: 14px; line-height: 20px; color: var(--muted); }
+  .pretend { display: block; font-size: 13px; line-height: 16px; color: var(--accent); margin-top: 4px; }
+
+  .memory {
+    background: var(--memory);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 48px;
+    animation: rise .4s ease-out;
+  }
+  .memory-when { margin: 0; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--accent); }
+  .memory blockquote { margin: 8px 0; font: italic 22px/32px var(--serif); }
+  .memory-cite { margin: 0; font-size: 14px; line-height: 20px; color: var(--muted); }
+
+  h1 { margin: 0 0 24px; font: 500 32px/40px var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .hint { margin: -8px 0 24px; font-size: 15px; line-height: 24px; color: var(--muted); }
+
+  textarea {
+    display: block;
+    width: 100%;
+    min-height: 128px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--ink);
+    font: 20px/32px var(--serif);
+    resize: vertical;
+    transition: border-color .15s;
+  }
+  textarea::placeholder { color: var(--muted); opacity: .7; }
+  textarea:focus { outline: none; border-color: var(--accent); }
+
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; }
+  .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .keys { color: var(--muted); opacity: .8; }
+
+  button { font: inherit; cursor: pointer; transition: background-color .15s, color .15s, transform .1s, opacity .15s; }
+  button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:active:not(:disabled) { transform: scale(.97); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .primary {
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 24px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+  .link {
+    border: 0; background: none; padding: 8px 0;
+    color: var(--accent); font-weight: 600; font-size: 15px;
+    text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px;
+  }
+  .link:hover { color: var(--accent-hover); }
+
+  .ghost {
+    border: 0; border-radius: 8px; padding: 8px 16px;
+    background: transparent; color: var(--muted); font-size: 14px;
+  }
+  .ghost:hover:not(:disabled) { background: var(--memory); color: var(--ink); }
+
+  .mine { margin: 0; font: 22px/32px var(--serif); }
+  .meta { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .compare { margin-top: 48px; animation: rise .4s ease-out; }
+  .compare h2 { margin: 0 0 16px; font-size: 16px; line-height: 24px; font-weight: 600; }
+  .timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+  .timeline::before {
+    content: ""; position: absolute; left: 3px; top: 12px; bottom: 12px; width: 2px; background: var(--line);
+  }
+  .timeline li { position: relative; padding: 0 0 24px 24px; }
+  .timeline li:last-child { padding-bottom: 0; }
+  .timeline li::before {
+    content: ""; position: absolute; left: 0; top: 6px; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--faint);
+  }
+  .timeline li.now::before { background: var(--accent); }
+  .timeline time { font-size: 14px; line-height: 20px; color: var(--muted); }
+  .timeline p { margin: 4px 0 0; font: 18px/28px var(--serif); color: var(--muted); }
+  .timeline li.now p { color: var(--ink); }
+
+  .archive { margin-top: 64px; }
+  .archive summary { cursor: pointer; padding: 8px 0; font-weight: 600; border-radius: 4px; }
+  .archive summary span { font-weight: 400; color: var(--muted); }
+  .archive ol { list-style: none; margin: 8px 0 0; padding: 0; }
+  .archive li { padding: 16px 0; border-top: 1px solid var(--line); }
+  .archive .when { font-size: 13px; line-height: 20px; color: var(--muted); }
+  .archive .q { margin: 0; font-size: 14px; line-height: 20px; color: var(--muted); }
+  .archive .a { margin: 4px 0 0; font: 18px/28px var(--serif); }
+  .empty { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+
+  .demo { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .demo p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+  .demo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: -16px; }
+  .demo-actions .danger:hover:not(:disabled) { color: var(--accent); }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 32px 16px 48px; }
+    .top { margin-bottom: 32px; }
+    h1 { font-size: 28px; line-height: 36px; }
+    .memory { padding: 16px; margin-bottom: 32px; }
+    .memory blockquote, .mine { font-size: 20px; line-height: 32px; }
+    .keys { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <span class="mark">Then &amp; Now</span>
+    <div class="date">
+      <time id="today"></time>
+      <span id="pretend" class="pretend" hidden></span>
+    </div>
+  </header>
+
+  <section id="memory" class="memory" hidden aria-label="A past answer">
+    <p id="memWhen" class="memory-when"></p>
+    <blockquote id="memText"></blockquote>
+    <p id="memCite" class="memory-cite"></p>
+  </section>
+
+  <section>
+    <h1 id="question"></h1>
+    <p id="hint" class="hint" hidden></p>
+
+    <form id="form">
+      <textarea id="answer" maxlength="280" aria-labelledby="question" placeholder="A sentence is enough."></textarea>
+      <div class="row">
+        <span class="count"><span id="count">0</span> / 280 <span class="keys">· Ctrl+Enter to save</span></span>
+        <button type="submit" id="save" class="primary" disabled>Save answer</button>
+      </div>
+    </form>
+
+    <div id="saved" hidden>
+      <p id="savedText" class="mine"></p>
+      <div class="row">
+        <p id="savedMeta" class="meta"></p>
+        <button type="button" id="edit" class="link">Edit</button>
+      </div>
+      <section id="compare" class="compare" hidden>
+        <h2>Every time you've answered this</h2>
+        <ol id="timeline" class="timeline"></ol>
+      </section>
+    </div>
+  </section>
+
+  <details class="archive">
+    <summary>Your answers <span id="archCount"></span></summary>
+    <ol id="archList"></ol>
+    <p id="archEmpty" class="empty" hidden>Nothing yet. Today's answer will be the first.</p>
+  </details>
+
+  <footer class="demo">
+    <p>Try it without waiting a year</p>
+    <div class="demo-actions">
+      <button type="button" class="ghost" id="nextDay">Skip to the next day</button>
+      <button type="button" class="ghost" id="backToday">Back to today</button>
+      <button type="button" class="ghost" id="sample">Load a sample year</button>
+      <button type="button" class="ghost danger" id="erase">Erase everything</button>
+    </div>
+  </footer>
+</main>
+
+<script>
+const KEY = 'thenandnow.v1';
+const REASK_AFTER_DAYS = 21;   // a question can come back this many days after you last answered it
+const REASK_CHANCE = 0.4;      // chance that a due question is re-asked instead of a new one
+const RANDOM_MEMORY_CHANCE = 0.5; // chance of a random memory when no anniversary matches
+const ANNIVERSARIES = [
+  [365, 'A year ago today'],
+  [182, 'Six months ago today'],
+  [91, 'Three months ago today'],
+  [30, 'A month ago today'],
+  [7, 'A week ago today'],
+];
+
+const QUESTIONS = [
+  ['smile', 'What made you smile today?'],
+  ['worry', 'What are you worried about right now?'],
+  ['proud', "What's one small thing you're proud of this week?"],
+  ['energy', 'What gave you energy today, and what drained it?'],
+  ['person', 'Who was on your mind today?'],
+  ['learn', 'What did you learn recently that surprised you?'],
+  ['looking', 'What are you looking forward to?'],
+  ['avoid', 'What are you putting off?'],
+  ['song', 'What song fits today?'],
+  ['change', 'If you could change one thing about today, what would it be?'],
+  ['grateful', "Name one ordinary thing you're glad you have."],
+  ['advice', 'What would you tell yourself a year ago?'],
+  ['meal', 'What was the best thing you ate today?'],
+  ['want', 'What do you want more of right now?'],
+  ['less', 'What do you want less of?'],
+  ['place', 'Where would you rather be right now?'],
+  ['habit', 'Which habit is helping you most lately?'],
+  ['kind', 'Who was kind to you recently?'],
+  ['decision', 'What decision is on your plate?'],
+  ['rest', 'How did you rest today?'],
+  ['word', 'Describe today in one word.'],
+  ['fear', "What would you do if you weren't afraid?"],
+  ['media', 'What are you reading, watching or listening to?'],
+  ['friend', "Which friend haven't you talked to in too long?"],
+  ['body', 'How does your body feel right now?'],
+  ['goal', "What's one thing you want to finish this month?"],
+  ['laugh', 'When did you last laugh properly?'],
+  ['home', 'What does home feel like at the moment?'],
+  ['money', 'What did you spend money on that was worth it?'],
+  ['morning', 'How did this morning start?'],
+  ['weekend', 'What would a perfect weekend look like right now?'],
+  ['past', 'What from the past crossed your mind today?'],
+];
+const Q = Object.fromEntries(QUESTIONS);
+
+const SAMPLE = [
+  [365, 'smile', 'Mads brought cinnamon buns to the study group. Nobody asked him to.'],
+  [340, 'worry', "The statistics exam. I still don't get confidence intervals."],
+  [300, 'looking', "Christmas at home. Mum's red cabbage."],
+  [270, 'word', 'Grey.'],
+  [240, 'avoid', 'Emailing my supervisor about the thesis topic.'],
+  [210, 'advice', 'Stop waiting to feel ready.'],
+  [182, 'worry', 'Whether I picked the right thesis topic.'],
+  [160, 'song', 'Motion Sickness, on repeat.'],
+  [120, 'smile', 'Cycling home along the lake with the sun out.'],
+  [91, 'want', 'Long walks without my phone.'],
+  [75, 'kind', 'The barista remembered my order.'],
+  [60, 'avoid', 'Booking the dentist. Still.'],
+  [45, 'grateful', 'A warm bike shed.'],
+  [30, 'decision', 'Whether to take the summer job in Copenhagen.'],
+  [21, 'word', 'Busy, but good.'],
+  [14, 'laugh', 'Board game night. Someone knocked the whole table over reaching for the dice.'],
+  [7, 'rest', 'Long shower, early night.'],
+  [3, 'looking', 'Friday, honestly.'],
+  [1, 'energy', 'The morning run gave it. Three hours of meetings took it.'],
+];
+
+/* ---------- storage ---------- */
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.entries) return { entries: s.entries, plans: s.plans || {}, offset: s.offset || 0 };
+  } catch (e) {}
+  return { entries: {}, plans: {}, offset: 0 };
+}
+let state = load();
+let editing = false;
+const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+
+/* ---------- dates (local, as YYYY-MM-DD) ---------- */
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+const daysBetween = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
+const realToday = () => iso(new Date());
+const today = () => addDays(realToday(), state.offset);
+function fmt(s, weekday = true) {
+  const d = parse(s);
+  const opts = { month: 'long', day: 'numeric' };
+  if (weekday) opts.weekday = 'long';
+  if (d.getFullYear() !== parse(today()).getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('en-US', opts);
+}
+function ago(s) {
+  const n = daysBetween(s, today());
+  if (n === 0) return 'today';
+  if (n === 1) return 'yesterday';
+  if (n < 60) return `${n} days ago`;
+  if (n < 365) return `${Math.round(n / 30.4)} months ago`;
+  const y = Math.floor(n / 365);
+  return y === 1 ? 'a year ago' : `${y} years ago`;
+}
+
+/* ---------- seeded randomness, so a day's question stays put ---------- */
+function rng(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  };
+}
+
+const sortedEntries = () => Object.entries(state.entries).sort(([a], [b]) => (a < b ? -1 : 1));
+
+/* ---------- picking the day's question and memory ---------- */
+function planFor(date) {
+  if (state.plans[date]) return state.plans[date];
+  const r = rng('then-and-now:' + date);
+  const past = sortedEntries().filter(([d]) => d < date);
+
+  const lastAsked = new Map();
+  for (const [d, e] of past) lastAsked.set(e.qid, d);
+  const byOldest = [...lastAsked].sort((a, b) => (a[1] < b[1] ? -1 : 1));
+  const due = byOldest.filter(([, d]) => daysBetween(d, date) >= REASK_AFTER_DAYS);
+  const fresh = QUESTIONS.filter(([id]) => !lastAsked.has(id));
+
+  let qid;
+  const roll = r();
+  if (due.length && (roll < REASK_CHANCE || !fresh.length)) qid = due[0][0];
+  else if (fresh.length) qid = fresh[Math.floor(r() * fresh.length)][0];
+  else qid = byOldest[0][0];
+
+  let memory = null;
+  for (const [n, label] of ANNIVERSARIES) {
+    const d = addDays(date, -n);
+    const e = state.entries[d];
+    if (e && e.qid !== qid) { memory = { date: d, label }; break; }
+  }
+  if (!memory) {
+    const pool = past.filter(([d, e]) => daysBetween(d, date) >= 7 && e.qid !== qid);
+    if (pool.length && r() < RANDOM_MEMORY_CHANCE) memory = { date: pool[Math.floor(r() * pool.length)][0], label: null };
+  }
+  return (state.plans[date] = { qid, memory });
+}
+
+/* ---------- rendering ---------- */
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+function render() {
+  const date = today();
+  const plan = planFor(date);
+  save();
+
+  $('today').textContent = fmt(date);
+  $('today').dateTime = date;
+  $('pretend').hidden = state.offset === 0;
+  $('pretend').textContent = `${state.offset} day${state.offset === 1 ? '' : 's'} ahead`;
+
+  const mem = plan.memory && state.entries[plan.memory.date];
+  $('memory').hidden = !mem;
+  if (mem) {
+    $('memWhen').textContent = plan.memory.label || `From ${ago(plan.memory.date)}`;
+    $('memText').textContent = mem.text;
+    $('memCite').textContent = `${fmt(plan.memory.date)}, when asked: ${Q[mem.qid]}`;
+  }
+
+  $('question').textContent = Q[plan.qid];
+
+  const entry = state.entries[date];
+  const before = sortedEntries().filter(([d, e]) => d < date && e.qid === plan.qid);
+  const showForm = !entry || editing;
+
+  $('form').hidden = !showForm;
+  $('saved').hidden = showForm;
+  $('hint').hidden = !(showForm && before.length && !entry);
+  if (before.length) {
+    const last = before[before.length - 1][0];
+    $('hint').textContent = `This one came back. You answered it ${ago(last)}. Write today's answer first, then compare.`;
+  }
+
+  if (showForm) {
+    if (editing && entry && !$('answer').value) $('answer').value = entry.text;
+    updateCount();
+  } else {
+    $('savedText').textContent = entry.text;
+    $('savedMeta').textContent = before.length ? 'Saved. Here is how it compares.' : 'Saved. See you tomorrow.';
+    $('compare').hidden = !before.length;
+    const tl = $('timeline');
+    tl.replaceChildren();
+    for (const [d, e] of [...before, [date, entry]]) {
+      const li = el('li', d === date ? 'now' : '');
+      const t = el('time', '', d === date ? 'Today' : `${fmt(d, false)} · ${ago(d)}`);
+      t.dateTime = d;
+      li.append(t, el('p', '', e.text));
+      tl.append(li);
+    }
+  }
+
+  const archived = sortedEntries().filter(([d]) => d <= date).reverse();
+  $('archCount').textContent = archived.length ? `· ${archived.length}` : '';
+  $('archEmpty').hidden = archived.length > 0;
+  const list = $('archList');
+  list.replaceChildren();
+  for (const [d, e] of archived) {
+    const li = el('li');
+    const t = el('time', 'when', `${fmt(d)} · ${ago(d)}`);
+    t.dateTime = d;
+    li.append(t, el('p', 'q', Q[e.qid]), el('p', 'a', e.text));
+    list.append(li);
+  }
+
+  $('backToday').disabled = state.offset === 0;
+  $('erase').disabled = !Object.keys(state.entries).length;
+}
+
+function updateCount() {
+  const v = $('answer').value;
+  $('count').textContent = v.length;
+  $('save').disabled = !v.trim();
+}
+
+/* ---------- actions ---------- */
+$('answer').addEventListener('input', updateCount);
+$('answer').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('form').requestSubmit(); }
+});
+$('form').addEventListener('submit', e => {
+  e.preventDefault();
+  const text = $('answer').value.trim();
+  if (!text) return;
+  const date = today();
+  state.entries[date] = { qid: planFor(date).qid, text };
+  editing = false;
+  $('answer').value = '';
+  render();
+});
+$('edit').addEventListener('click', () => {
+  editing = true;
+  $('answer').value = '';
+  render();
+  $('answer').focus();
+});
+
+function goTo(offset) {
+  state.offset = Math.max(0, offset);
+  editing = false;
+  $('answer').value = '';
+  render();
+  window.scrollTo({ top: 0 });
+}
+$('nextDay').addEventListener('click', () => goTo(state.offset + 1));
+$('backToday').addEventListener('click', () => goTo(0));
+
+$('sample').addEventListener('click', () => {
+  if (Object.keys(state.entries).length && !confirm('Replace your answers with a sample year?')) return;
+  const base = realToday();
+  state = { entries: {}, plans: {}, offset: 0 };
+  for (const [n, qid, text] of SAMPLE) state.entries[addDays(base, -n)] = { qid, text };
+  goTo(0);
+});
+$('erase').addEventListener('click', () => {
+  if (!confirm('Erase every answer? This cannot be undone.')) return;
+  state = { entries: {}, plans: {}, offset: 0 };
+  goTo(0);
+});
+
+render();
+</script>
+</body>
+</html>
