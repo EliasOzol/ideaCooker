@@ -67,7 +67,7 @@
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     min-height: 36px; padding: 0 16px;
-    font: 500 14px/1 var(--sans); color: var(--ink);
+    font: 500 14px/1 var(--sans); color: var(--ink); text-decoration: none;
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
     cursor: pointer; transition: background .15s, border-color .15s, transform .1s;
   }
@@ -85,19 +85,20 @@
     text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
     transition: color .15s, text-decoration-color .15s;
   }
-  .link-btn:hover { color: var(--ink); text-decoration-color: currentColor; }
+  .link-btn:hover:not(:disabled) { color: var(--ink); text-decoration-color: currentColor; }
+  .link-btn:disabled { opacity: .4; cursor: not-allowed; }
 
   .field { display: grid; gap: 4px; }
-  .field > span { font-size: 13px; font-weight: 500; color: var(--muted); display: flex; justify-content: space-between; }
-  .field input, .field textarea {
-    width: 100%; padding: 8px 12px;
+  .field > span, .label { font-size: 13px; font-weight: 500; color: var(--muted); display: flex; justify-content: space-between; }
+  .field input, .field textarea, .field select {
+    width: 100%; min-height: 38px; padding: 8px 12px;
     font: inherit; color: var(--ink);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
     transition: border-color .15s, box-shadow .15s;
   }
   .field textarea { resize: vertical; line-height: 1.55; }
-  .field input:hover, .field textarea:hover { border-color: color-mix(in srgb, var(--muted) 45%, var(--line)); }
-  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+  .field input:hover, .field textarea:hover, .field select:hover { border-color: color-mix(in srgb, var(--muted) 45%, var(--line)); }
+  .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
   .field .count { font-weight: 400; font-variant-numeric: tabular-nums; }
   .field .count.over { color: var(--danger); }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -114,6 +115,11 @@
   .group h2 { font: 600 16px/1.3 var(--sans); }
   .meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .hint { font-size: 13px; color: var(--muted); }
+
+  /* Picture pickers */
+  .picker { display: flex; align-items: center; gap: 16px; }
+  .picker-actions { display: grid; gap: 4px; justify-items: start; }
+  .picker-actions .row { display: flex; align-items: center; gap: 16px; }
 
   /* Project list */
   .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -140,7 +146,6 @@
   .row-sum { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .list li.is-hidden .row-title, .list li.is-hidden .cover { opacity: .5; }
   .pill { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--sunk); color: var(--muted); }
-  .pill.accent { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
 
   /* Editor */
   .order-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -149,12 +154,11 @@
   .toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s var(--ease); }
   .toggle input:checked { background: var(--accent); }
   .toggle input:checked::after { transform: translateX(16px); }
-  .hues { display: flex; gap: 8px; border: 0; padding: 0; margin: 0; }
-  .hues legend { font-size: 13px; font-weight: 500; color: var(--muted); padding: 0; margin-bottom: 4px; }
+  .hues { display: flex; gap: 8px; }
   .hues label { position: relative; cursor: pointer; }
   .hues input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-  .hues .dot { display: block; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, hsl(var(--h) 65% 60%), hsl(calc(var(--h) + 35) 60% 38%)); transition: transform .15s, box-shadow .15s; }
-  .hues label:hover .dot { transform: scale(1.08); }
+  .hues .dot { display: block; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, hsl(var(--h) 65% 60%), hsl(calc(var(--h) + 35) 60% 38%)); transition: transform .15s, box-shadow .15s; }
+  .hues label:hover .dot { transform: scale(1.1); }
   .hues input:checked + .dot { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
   .hues input:focus-visible + .dot { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
   .editor-foot { display: flex; justify-content: flex-end; }
@@ -176,48 +180,43 @@
 
   /* Stage (viewer rendering, shared by preview and viewer page) */
   .stage { container-type: inline-size; padding: 48px 40px 56px; }
-  .st-head { margin-bottom: 40px; }
-  .st-role { font: 500 13px/1.4 var(--sans); color: var(--accent); margin-bottom: 8px; }
-  .st-name { font: 600 40px/1.1 var(--serif); letter-spacing: -.01em; margin-bottom: 16px; }
-  .st-intro { font-size: 17px; line-height: 1.6; color: var(--muted); max-width: 56ch; }
-  .feature {
-    display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: center;
-    width: 100%; padding: 0; margin-bottom: 48px;
-    background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
-  }
-  .feature .cover { aspect-ratio: 4 / 3; border-radius: 12px; }
-  .feature-text { display: grid; gap: 8px; }
-  .kicker { font: 500 13px/1.4 var(--sans); color: var(--muted); }
-  .feature-title { font: 600 28px/1.2 var(--serif); }
-  .feature-sum { font-size: 16px; line-height: 1.55; color: var(--muted); }
-  .more { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent); display: inline-flex; gap: 4px; }
-  .more i { font-style: normal; transition: transform .2s var(--ease); }
-  .feature:hover .cover { transform: scale(1.015); }
-  .feature:hover .more i { transform: translateX(4px); }
-  .st-sub { font: 600 20px/1.3 var(--serif); margin-bottom: 8px; }
-  .index { list-style: none; margin: 0; padding: 0; }
-  .index li + li { border-top: 1px solid var(--line); }
-  .index button {
-    display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 16px;
-    width: 100%; padding: 16px 8px; margin: 0 -8px; box-sizing: content-box;
-    background: none; border: 0; border-radius: 10px; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  .st-head { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 24px; row-gap: 24px; align-items: center; margin-bottom: 48px; }
+  .st-who { display: grid; gap: 4px; }
+  .st-name { font: 600 36px/1.1 var(--serif); letter-spacing: -.01em; }
+  .st-role { font: 500 16px/1.4 var(--sans); color: var(--accent); }
+  .st-intro { grid-column: 1 / -1; font-size: 17px; line-height: 1.6; color: var(--muted); max-width: 56ch; }
+
+  .work { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .work li + li { border-top: 1px solid var(--line); padding-top: 8px; }
+  .work button {
+    display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: center; gap: 24px;
+    width: 100%; padding: 16px; margin: 0 -16px; box-sizing: content-box;
+    background: none; border: 0; border-radius: 16px; color: inherit; font: inherit; text-align: left; cursor: pointer;
     transition: background .15s;
   }
-  .index button:hover { background: var(--sunk); }
-  .index-title { display: block; font: 600 17px/1.3 var(--serif); }
-  .index-sum { display: block; font-size: 14px; color: var(--muted); }
-  .index-year { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .work button:hover { background: var(--sunk); }
+  .work .cover { width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; }
+  .work-text { display: grid; gap: 8px; justify-items: start; }
+  .work-title { font: 600 22px/1.25 var(--serif); }
+  .work-sum { font-size: 15px; line-height: 1.55; color: var(--muted); }
+  .work-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .more { font-size: 14px; font-weight: 600; color: var(--accent); display: inline-flex; gap: 4px; }
+  .more i { font-style: normal; transition: transform .2s var(--ease); }
+  .work button:hover .more i { transform: translateX(4px); }
+  .work button:hover .cover { transform: scale(1.015); }
+  .cat { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 500; background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); }
+  .cat a { text-underline-offset: 3px; }
   .st-empty { padding: 48px 24px; text-align: center; color: var(--muted); border-radius: 12px; background: var(--sunk); }
   @container (max-width: 560px) {
     .stage { padding: 32px 20px 40px; }
-    .st-name { font-size: 32px; }
-    .feature { grid-template-columns: 1fr; gap: 16px; }
-    .index button { grid-template-columns: 48px minmax(0, 1fr); }
-    .index .cover.sm { width: 48px; height: 48px; }
-    .index-year { display: none; }
+    .st-head { column-gap: 16px; }
+    .st-head .avatar { width: 72px; height: 72px; }
+    .st-head .avatar > span { font-size: 26px; }
+    .st-name { font-size: 28px; }
+    .work button { grid-template-columns: 1fr; gap: 16px; }
   }
 
-  /* Generated covers */
+  /* Generated covers and pictures */
   .cover {
     position: relative; overflow: hidden; flex: none;
     display: grid; place-items: center;
@@ -225,18 +224,25 @@
     transition: transform .3s var(--ease);
   }
   .cover::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, rgba(255,255,255,.09) 0 2px, transparent 2px 12px); }
+  .cover.has-img { background: var(--sunk); }
+  .cover.has-img::after { display: none; }
+  .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .cover > span { position: relative; z-index: 1; font-family: var(--serif); font-weight: 600; color: rgba(255,255,255,.94); letter-spacing: -.02em; }
   .cover.xs { width: 32px; height: 32px; border-radius: 6px; }
   .cover.xs > span { font-size: 13px; }
-  .cover.sm { width: 56px; height: 56px; border-radius: 8px; }
-  .cover.sm > span { font-size: 20px; }
-  .cover.lg > span { font-size: 72px; }
+  .cover.sm { width: 64px; height: 48px; border-radius: 8px; }
+  .cover.sm > span { font-size: 18px; }
+  .cover.md > span { font-size: 48px; }
   .cover.xl { width: 100%; aspect-ratio: 16 / 7; }
   .cover.xl > span { font-size: 72px; }
+  .avatar { border-radius: 50%; width: 96px; height: 96px; }
+  .avatar::after { display: none; }
+  .avatar > span { font-size: 34px; }
+  .avatar.small { width: 56px; height: 56px; }
+  .avatar.small > span { font-size: 20px; }
 
   /* Viewer page */
   .viewer { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
-  .viewer .stage { padding-top: 48px; }
 
   /* Detail panel */
   dialog#detail {
@@ -272,14 +278,14 @@
   .toast {
     position: fixed; left: 50%; bottom: 24px; z-index: 20;
     display: flex; align-items: center; gap: 16px;
-    padding: 12px 12px 12px 16px; border-radius: 12px;
+    padding: 12px 16px; border-radius: 12px;
     background: var(--ink); color: var(--bg); font-size: 14px;
     box-shadow: 0 12px 32px -12px rgba(0,0,0,.4);
     transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
     transition: transform .2s var(--ease), opacity .2s;
   }
   .toast.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
-  .toast button { padding: 6px 12px; border: 0; border-radius: 8px; background: color-mix(in srgb, var(--bg) 18%, transparent); color: inherit; font: 600 14px/1 var(--sans); cursor: pointer; }
+  .toast button { margin: -4px -4px -4px 0; padding: 6px 12px; border: 0; border-radius: 8px; background: color-mix(in srgb, var(--bg) 18%, transparent); color: inherit; font: 600 14px/1 var(--sans); cursor: pointer; }
   .toast button:hover { background: color-mix(in srgb, var(--bg) 30%, transparent); }
 
   @media (max-width: 880px) {
@@ -312,16 +318,26 @@
   <section class="backstage" aria-label="Maker controls">
     <div class="group">
       <h2>Profile</h2>
+      <div class="picker">
+        <span id="pAvatar"></span>
+        <div class="picker-actions">
+          <span class="label">Profile photo</span>
+          <div class="row">
+            <button class="btn" id="pPhotoBtn">Upload photo</button>
+            <button class="link-btn" id="pPhotoClear">Remove</button>
+          </div>
+        </div>
+      </div>
       <div class="grid-2">
         <label class="field"><span>Name</span><input id="pName" autocomplete="off"></label>
-        <label class="field"><span>Headline</span><input id="pRole" autocomplete="off"></label>
+        <label class="field"><span>Profession</span><input id="pRole" autocomplete="off" placeholder="e.g. Software student"></label>
       </div>
       <label class="field"><span>Intro</span><textarea id="pIntro" rows="3"></textarea></label>
     </div>
 
     <div class="group">
       <div class="group-head"><h2>Projects</h2><span class="meta" id="count"></span></div>
-      <p class="hint">Drag to reorder, or use Alt + ↑/↓ on a selected row. The first shown project is featured.</p>
+      <p class="hint">Viewers see them top to bottom in this order. Drag to reorder, or use Alt + ↑/↓ on a selected row.</p>
       <ol class="list" id="list"></ol>
       <div><button class="btn primary" id="add">Add project</button></div>
     </div>
@@ -332,8 +348,9 @@
       <button class="link-btn" id="export">Export JSON</button>
       <button class="link-btn" id="importBtn">Import JSON</button>
       <button class="link-btn" id="reset">Reset to sample</button>
-      <input type="file" id="importFile" accept="application/json,.json" hidden>
     </div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <input type="file" id="imageFile" accept="image/*" hidden>
   </section>
 
   <section class="preview" aria-label="Viewer preview">
@@ -353,7 +370,7 @@
   <div class="d-inner">
     <div class="d-cover"><button class="d-close" id="dClose" aria-label="Close">×</button><div id="dCover"></div></div>
     <div class="d-body">
-      <p class="kicker" id="dMeta"></p>
+      <div class="work-meta" id="dMeta"></div>
       <h2 class="d-title" id="dTitle"></h2>
       <p class="d-sum" id="dSum"></p>
       <div class="tags" id="dTags"></div>
@@ -372,31 +389,39 @@
 <script>
 const KEY = 'backstage-folio-v1';
 const HUES = [14, 38, 150, 195, 250, 320];
+const KINDS = { '': 'No category', hobby: 'Hobby project', university: 'University project' };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 9);
+const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u).trim()) ? String(u).trim() : '';
+const safeImg = u => /^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(String(u)) ? String(u) : '';
 
 function seed() {
   return {
     profile: {
       name: 'Elias',
-      role: 'One small idea a day',
+      role: 'Student and maker',
+      photo: '',
       intro: 'Every day I write down one idea and build a working prototype for it. These are the ones worth a closer look.'
     },
     items: [
-      { id: uid(), title: 'Idea Cooker', year: '2026', hue: 14, hidden: false, link: '',
+      { id: uid(), title: 'Idea Cooker', year: '2026', hue: 14, hidden: false, link: '', image: '',
+        kind: 'hobby', course: '', courseUrl: '',
         tags: ['AI', 'Local tool'],
         summary: 'A local chat that turns one written idea into a README and a working prototype.',
         description: 'I write down one idea a day. Idea Cooker takes that sentence, picks a name, writes a README and builds a small prototype in a dated folder of my daily-ideas repo.\n\nIt runs as a local chat on my PC at home, and commits and pushes each new folder by itself.\n\n- One idea in, one folder out\n- README with a status and next steps\n- A prototype that opens with a double-click' },
-      { id: uid(), title: 'BrainReminder', year: '2026', hue: 150, hidden: false, link: '',
+      { id: uid(), title: 'BrainReminder', year: '2026', hue: 150, hidden: false, link: '', image: '',
+        kind: 'hobby', course: '', courseUrl: '',
         tags: ['Health', 'Web app'],
         summary: 'A break alarm where snoozing makes the next challenge bigger.',
         description: 'Every so often an alarm goes off with a small physical challenge: five squats, a glass of water, a minute of walking.\n\nYou can snooze, but the challenge accrues interest. Snooze "5 squats" for ten minutes and it comes back as 8. Paying off break debt early is always cheaper.\n\n- Snooze 5 min: +25% interest\n- Snooze 10 min: +60% interest, compounding\n- Daily streak of completed breaks, saved in the browser' },
-      { id: uid(), title: 'Backstage Folio', year: '2026', hue: 250, hidden: false, link: '',
+      { id: uid(), title: 'Backstage Folio', year: '2026', hue: 250, hidden: false, link: '', image: '',
+        kind: 'hobby', course: '', courseUrl: '',
         tags: ['Web app', 'Portfolio'],
         summary: 'A portfolio with a maker side for editing and a viewer side for showing.',
-        description: 'The maker page adds, removes and reorders projects and decides which one is featured. The viewer page shows the same list read-only, in that order.\n\nBoth pages read the same data, so a change backstage shows up on stage right away, even in another tab.\n\nNext: fold it into Idea Cooker so a finished idea can be published here with one click.' },
-      { id: uid(), title: 'BrainReminder Desk Button', year: '2026', hue: 38, hidden: true, link: '',
+        description: 'The maker page adds, removes and reorders projects. The viewer page shows the same list read-only, top to bottom in that order.\n\nBoth pages read the same data, so a change backstage shows up on stage right away, even in another tab.\n\nNext: fold it into Idea Cooker so a finished idea can be published here with one click.' },
+      { id: uid(), title: 'BrainReminder Desk Button', year: '2026', hue: 38, hidden: true, link: '', image: '',
+        kind: 'hobby', course: '', courseUrl: '',
         tags: ['Hardware', 'ESP32'],
         summary: 'An ESP32 with a buzzer and one big snooze button.',
         description: 'A physical version of BrainReminder. The ESP32 runs the timer, the buzzer goes off, and the only way to silence it is the button, which still adds interest.\n\nStill a sketch. Hidden until there is a build to show.' }
@@ -408,7 +433,7 @@ function normalize(data) {
   if (!data || !Array.isArray(data.items)) throw new Error('No items list');
   const p = data.profile || {};
   return {
-    profile: { name: String(p.name ?? ''), role: String(p.role ?? ''), intro: String(p.intro ?? '') },
+    profile: { name: String(p.name ?? ''), role: String(p.role ?? ''), intro: String(p.intro ?? ''), photo: safeImg(p.photo ?? '') },
     items: data.items.map((it, i) => ({
       id: String(it.id || uid()),
       title: String(it.title ?? ''),
@@ -418,7 +443,11 @@ function normalize(data) {
       tags: Array.isArray(it.tags) ? it.tags.map(String) : [],
       link: String(it.link ?? ''),
       hue: Number.isFinite(+it.hue) ? +it.hue : HUES[i % HUES.length],
-      hidden: !!it.hidden
+      hidden: !!it.hidden,
+      image: safeImg(it.image ?? ''),
+      kind: it.kind === undefined ? 'hobby' : (String(it.kind) in KINDS ? String(it.kind) : ''),
+      course: String(it.course ?? ''),
+      courseUrl: String(it.courseUrl ?? '')
     }))
   };
 }
@@ -432,7 +461,10 @@ let state = load() || seed();
 let selectedId = state.items[0]?.id ?? null;
 let mode = 'maker';
 
-const persist = () => localStorage.setItem(KEY, JSON.stringify(state));
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
+  catch { return false; }
+}
 const selected = () => state.items.find(i => i.id === selectedId);
 const visible = () => state.items.filter(i => !i.hidden);
 const titleOf = it => it.title.trim() || 'Untitled project';
@@ -446,7 +478,23 @@ function initials(t) {
   }
   return (words[0][0] + words[1][0]).toUpperCase();
 }
-const cover = (it, size) => `<span class="cover ${size}" style="--h:${+it.hue}" aria-hidden="true"><span>${esc(initials(it.title))}</span></span>`;
+const cover = (it, size) => it.image
+  ? `<span class="cover ${size} has-img" aria-hidden="true"><img src="${esc(it.image)}" alt=""></span>`
+  : `<span class="cover ${size}" style="--h:${+it.hue}" aria-hidden="true"><span>${esc(initials(it.title))}</span></span>`;
+const avatar = (p, extra = '') => p.photo
+  ? `<span class="cover avatar has-img ${extra}"><img src="${esc(p.photo)}" alt="${esc(p.name)}"></span>`
+  : `<span class="cover avatar ${extra}" style="--h:14" aria-hidden="true"><span>${esc(initials(p.name || '?'))}</span></span>`;
+
+// Category chip. withLink = false inside buttons (no nested links).
+function category(it, withLink) {
+  if (!it.kind) return '';
+  let html = `#${esc(KINDS[it.kind])}`;
+  if (it.kind === 'university' && it.course.trim()) {
+    const url = safeUrl(it.courseUrl);
+    html += ` · ${withLink && url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(it.course)} ↗</a>` : esc(it.course)}`;
+  }
+  return `<span class="cat">${html}</span>`;
+}
 
 /* ---------- Mode ---------- */
 function applyMode() {
@@ -469,10 +517,15 @@ function renderProfile() {
   $('#pName').value = state.profile.name;
   $('#pRole').value = state.profile.role;
   $('#pIntro').value = state.profile.intro;
+  renderAvatarPicker();
+}
+function renderAvatarPicker() {
+  $('#pAvatar').innerHTML = avatar(state.profile, 'small');
+  $('#pPhotoBtn').textContent = state.profile.photo ? 'Change photo' : 'Upload photo';
+  $('#pPhotoClear').disabled = !state.profile.photo;
 }
 
 function renderList() {
-  const firstVisible = visible()[0];
   $('#list').innerHTML = state.items.map(it => `
     <li data-id="${esc(it.id)}" draggable="true" class="${it.id === selectedId ? 'selected' : ''} ${it.hidden ? 'is-hidden' : ''}">
       <span class="handle" aria-hidden="true"><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="3" r="1.5"/><circle cx="8" cy="3" r="1.5"/><circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="2" cy="13" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg></span>
@@ -480,7 +533,6 @@ function renderList() {
         ${cover(it, 'xs')}
         <span class="row-text"><span class="row-title">${esc(titleOf(it))}</span><span class="row-sum">${esc(it.summary || 'No summary yet')}</span></span>
         ${it.hidden ? '<span class="pill">Hidden</span>' : ''}
-        ${it === firstVisible ? '<span class="pill accent">Featured</span>' : ''}
       </button>
     </li>`).join('');
   const shown = visible().length, hidden = state.items.length - shown;
@@ -507,15 +559,33 @@ function renderEditor() {
       <label class="field"><span>Title</span><input data-f="title" value="${esc(it.title)}" placeholder="Project name" autocomplete="off"></label>
       <label class="field"><span>Year</span><input data-f="year" value="${esc(it.year)}" inputmode="numeric" autocomplete="off"></label>
     </div>
+    <div class="picker">
+      ${cover(it, 'sm')}
+      <div class="picker-actions">
+        <span class="label">Picture</span>
+        <div class="row">
+          <button class="btn" data-act="image">${it.image ? 'Change picture' : 'Upload picture'}</button>
+          <button class="link-btn" data-act="clear-image" ${it.image ? '' : 'disabled'}>Remove</button>
+        </div>
+      </div>
+    </div>
+    ${it.image ? '' : `<div class="field"><span>Cover colour when there is no picture</span>
+      <div class="hues" role="radiogroup" aria-label="Cover colour">
+        ${HUES.map(h => `<label><input type="radio" name="hue" data-f="hue" value="${h}" ${h === it.hue ? 'checked' : ''} aria-label="Hue ${h}"><span class="dot" style="--h:${h}"></span></label>`).join('')}
+      </div></div>`}
     <label class="field"><span>Preview line <span class="count" id="sumCount"></span></span><input data-f="summary" value="${esc(it.summary)}" placeholder="What it is, in one sentence" autocomplete="off"></label>
     <label class="field"><span>Full description</span><textarea data-f="description" rows="7" placeholder="Shown when a viewer opens the project. Blank line = new paragraph, “- ” = bullet.">${esc(it.description)}</textarea></label>
+    <label class="field"><span>Category</span>
+      <select data-f="kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}" ${k === it.kind ? 'selected' : ''}>${k ? '#' + v : v}</option>`).join('')}</select>
+    </label>
+    ${it.kind === 'university' ? `<div class="grid-2">
+      <label class="field"><span>Course</span><input data-f="course" value="${esc(it.course)}" placeholder="Course name" autocomplete="off"></label>
+      <label class="field"><span>Course link</span><input data-f="courseUrl" type="url" value="${esc(it.courseUrl)}" placeholder="https://" autocomplete="off"></label>
+    </div>` : ''}
     <div class="grid-2">
       <label class="field"><span>Tags</span><input data-f="tags" value="${esc(it.tags.join(', '))}" placeholder="Comma separated" autocomplete="off"></label>
-      <label class="field"><span>Link</span><input data-f="link" type="url" value="${esc(it.link)}" placeholder="https://" autocomplete="off"></label>
+      <label class="field"><span>Project link</span><input data-f="link" type="url" value="${esc(it.link)}" placeholder="https://" autocomplete="off"></label>
     </div>
-    <fieldset class="hues"><legend>Cover colour</legend>
-      ${HUES.map(h => `<label><input type="radio" name="hue" data-f="hue" value="${h}" ${h === it.hue ? 'checked' : ''} aria-label="Hue ${h}"><span class="dot" style="--h:${h}"></span></label>`).join('')}
-    </fieldset>
     <div class="editor-foot"><button class="btn danger" data-act="remove">Remove project</button></div>`;
   updateSumCount();
 }
@@ -530,31 +600,27 @@ function updateSumCount() {
 function renderStage(root) {
   const items = visible();
   const p = state.profile;
-  const [first, ...rest] = items;
   root.innerHTML = `
     <header class="st-head">
-      ${p.role ? `<p class="st-role">${esc(p.role)}</p>` : ''}
-      <h1 class="st-name">${esc(p.name || 'Portfolio')}</h1>
+      ${avatar(p)}
+      <div class="st-who">
+        <h1 class="st-name">${esc(p.name || 'Portfolio')}</h1>
+        ${p.role ? `<p class="st-role">${esc(p.role)}</p>` : ''}
+      </div>
       ${p.intro ? `<p class="st-intro">${esc(p.intro)}</p>` : ''}
     </header>
-    ${!first ? `<p class="st-empty">Nothing on show yet.</p>` : `
-      <button class="feature" data-open="${esc(first.id)}">
-        ${cover(first, 'lg')}
-        <span class="feature-text">
-          <span class="kicker">Featured${first.year ? ` · ${esc(first.year)}` : ''}</span>
-          <span class="feature-title">${esc(titleOf(first))}</span>
-          ${first.summary ? `<span class="feature-sum">${esc(first.summary)}</span>` : ''}
-          <span class="more">Read more <i>→</i></span>
-        </span>
-      </button>
-      ${rest.length ? `<h2 class="st-sub">More work</h2>
-      <ol class="index">${rest.map(it => `
+    ${!items.length ? `<p class="st-empty">Nothing on show yet.</p>` : `
+      <ol class="work">${items.map(it => `
         <li><button data-open="${esc(it.id)}">
-          ${cover(it, 'sm')}
-          <span><span class="index-title">${esc(titleOf(it))}</span>${it.summary ? `<span class="index-sum">${esc(it.summary)}</span>` : ''}</span>
-          <span class="index-year">${esc(it.year)}</span>
+          ${cover(it, 'md')}
+          <span class="work-text">
+            <span class="work-meta">${category(it, false)}${it.year ? `<span>${esc(it.year)}</span>` : ''}</span>
+            <span class="work-title">${esc(titleOf(it))}</span>
+            ${it.summary ? `<span class="work-sum">${esc(it.summary)}</span>` : ''}
+            <span class="more">Read more <i>→</i></span>
+          </span>
         </button></li>`).join('')}
-      </ol>` : ''}`}`;
+      </ol>`}`;
 }
 
 function renderStages() {
@@ -582,13 +648,14 @@ function removeItem(id) {
   const idx = state.items.findIndex(i => i.id === id);
   if (idx < 0) return;
   const [it] = state.items.splice(idx, 1);
-  undoData = { it, idx };
   selectedId = (state.items[idx] || state.items[idx - 1])?.id ?? null;
   commit();
-  showToast(`Removed “${titleOf(it)}”`);
+  showToast(`Removed “${titleOf(it)}”`, { it, idx });
 }
-function showToast(msg) {
+function showToast(msg, undo = null) {
+  undoData = undo;
   $('#toastMsg').textContent = msg;
+  $('#toastUndo').hidden = !undo;
   $('#toast').classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { $('#toast').classList.remove('show'); undoData = null; }, 6000);
@@ -602,18 +669,56 @@ $('#toastUndo').addEventListener('click', () => {
   commit();
 });
 
+/* ---------- Pictures ---------- */
+// Downscale to a JPEG data URL so pictures fit in localStorage.
+async function readImage(file, max) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s);
+    c.height = Math.round(img.naturalHeight * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.82);
+  } finally { URL.revokeObjectURL(url); }
+}
+
+let imageTarget = null; // { kind: 'profile' } or { kind: 'item', id }
+function pickImage(target) { imageTarget = target; $('#imageFile').click(); }
+$('#imageFile').addEventListener('change', async e => {
+  const file = e.target.files[0], target = imageTarget;
+  e.target.value = '';
+  if (!file || !target) return;
+  let data;
+  try { data = await readImage(file, target.kind === 'profile' ? 400 : 1000); }
+  catch { return showToast('That file could not be read as an image.'); }
+  const obj = target.kind === 'profile' ? state.profile : state.items.find(i => i.id === target.id);
+  if (!obj) return;
+  const key = target.kind === 'profile' ? 'photo' : 'image';
+  const before = obj[key];
+  obj[key] = data;
+  if (!persist()) { obj[key] = before; return showToast('Browser storage is full. Try a smaller picture or remove another one.'); }
+  renderAvatarPicker(); renderList(); renderEditor(); renderStages();
+});
+$('#pPhotoBtn').addEventListener('click', () => pickImage({ kind: 'profile' }));
+$('#pPhotoClear').addEventListener('click', () => { state.profile.photo = ''; persist(); renderAvatarPicker(); renderStages(); });
+
 /* ---------- Maker events ---------- */
 [['#pName', 'name'], ['#pRole', 'role'], ['#pIntro', 'intro']].forEach(([sel, k]) => {
-  $(sel).addEventListener('input', e => { state.profile[k] = e.target.value; persist(); renderStages(); });
+  $(sel).addEventListener('input', e => {
+    state.profile[k] = e.target.value; persist(); renderStages();
+    if (k === 'name') $('#pAvatar').innerHTML = avatar(state.profile, 'small');
+  });
 });
 
 $('#add').addEventListener('click', () => {
-  const it = { id: uid(), title: '', summary: '', description: '', year: String(new Date().getFullYear()), tags: [], link: '', hue: HUES[state.items.length % HUES.length], hidden: false };
+  const it = { id: uid(), title: '', summary: '', description: '', year: String(new Date().getFullYear()), tags: [], link: '', hue: HUES[state.items.length % HUES.length], hidden: false, image: '', kind: 'hobby', course: '', courseUrl: '' };
   state.items.push(it);
   selectedId = it.id;
   commit();
-  const t = $('#editor [data-f="title"]');
-  t.focus();
+  $('#editor [data-f="title"]').focus();
   $('#editor').scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 });
 
@@ -681,6 +786,7 @@ editor.addEventListener('input', e => {
   else it[f] = v;
   if (f === 'summary') updateSumCount();
   persist(); renderList(); renderStages();
+  if (f === 'kind') { renderEditor(); editor.querySelector('[data-f="kind"]').focus(); }
 });
 editor.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'), it = selected();
@@ -688,6 +794,8 @@ editor.addEventListener('click', e => {
   const i = state.items.indexOf(it);
   const act = b.dataset.act;
   if (act === 'remove') return removeItem(it.id);
+  if (act === 'image') return pickImage({ kind: 'item', id: it.id });
+  if (act === 'clear-image') { it.image = ''; return commit(); }
   move(it.id, act === 'top' ? 0 : act === 'up' ? i - 1 : i + 1);
   editor.querySelector(`[data-act="${act}"]:not(:disabled)`)?.focus();
 });
@@ -708,7 +816,7 @@ $('#importFile').addEventListener('change', async e => {
     selectedId = state.items[0]?.id ?? null;
     persist(); renderAll();
     showToast(`Imported ${state.items.length} projects`);
-  } catch { alert('That file is not a Backstage Folio export.'); }
+  } catch { showToast('That file is not a Backstage Folio export.'); }
 });
 $('#reset').addEventListener('click', () => {
   if (!confirm('Replace your portfolio with the sample projects?')) return;
@@ -737,16 +845,16 @@ function openDetail(id) {
   if (detailIdx < 0) return;
   const it = detailList[detailIdx];
   $('#dCover').innerHTML = cover(it, 'xl');
-  $('#dMeta').textContent = [detailIdx === 0 ? 'Featured' : '', it.year].filter(Boolean).join(' · ');
+  $('#dMeta').innerHTML = category(it, true) + (it.year ? `<span>${esc(it.year)}</span>` : '');
   $('#dTitle').textContent = titleOf(it);
   $('#dSum').textContent = it.summary;
   $('#dSum').hidden = !it.summary;
   $('#dTags').innerHTML = it.tags.map(t => `<span class="pill">${esc(t)}</span>`).join('');
   $('#dTags').hidden = !it.tags.length;
   $('#dDesc').innerHTML = formatDesc(it.description);
-  const safe = /^https?:\/\/\S+$/i.test(it.link.trim());
-  $('#dLink').hidden = !safe;
-  if (safe) $('#dLink').href = it.link.trim();
+  const url = safeUrl(it.link);
+  $('#dLink').hidden = !url;
+  if (url) $('#dLink').href = url;
   const prev = detailList[detailIdx - 1], next = detailList[detailIdx + 1];
   $('#dPrev').disabled = !prev; $('#dPrev span').textContent = prev ? `← ${titleOf(prev)}` : '← Previous';
   $('#dNext').disabled = !next; $('#dNext span').textContent = next ? `${titleOf(next)} →` : 'Next →';
@@ -763,7 +871,6 @@ $('#dNext').addEventListener('click', () => step(1));
 $('#dClose').addEventListener('click', () => dlg.close());
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 dlg.addEventListener('keydown', e => {
-  if (e.target.matches('input, textarea')) return;
   if (e.key === 'ArrowLeft') step(-1);
   if (e.key === 'ArrowRight') step(1);
 });
