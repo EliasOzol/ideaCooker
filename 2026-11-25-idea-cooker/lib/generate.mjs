@@ -25,6 +25,9 @@ const RULES_SHELL = `You may run shell commands inside the project folder to che
 const CHECKS_NO_SHELL = `You can't run commands, so you can't run the tests or the app. Read the code carefully instead, and say what the user should run to check your change.`;
 const CHECKS_SHELL = `Check your change by running it: run the project's tests (install dependencies first if needed, e.g. npm install), and if it has a local server or test site, start it in the background, request its pages, then stop it. Tell the user what you ran and what passed or failed, and what they still need to try by hand (for example a browser extension in their browser).`;
 
+/** What a demo for the preview panel is; used when linking a repo and when keeping the demo up to date. */
+const demoSpec = (demoPath, projectLabel) => `\`${demoPath}\` is the live demo that the user's preview panel shows for ${projectLabel}: one self-contained HTML page (inline CSS and JS, no build step, no network, no external files) that lets them try the project's core flow right away with dummy data. Reuse the project's real logic where you can by copying the relevant functions in, so the demo behaves like the real thing; fake only what can't run in a plain web page (browser-extension APIs, servers, logins, file access), and keep fakes small and clearly in-memory. Put a one-line note at the top saying it's a demo with dummy data. It is not part of the project's repository.`;
+
 /** Commands Claude may never run, even with commands allowed. This is a guard, not a sandbox. */
 const BLOCKED_COMMANDS = [
   [/\bgit\s+(push|commit|reset|clean|checkout|switch|rebase|merge|remote|config|tag|stash|rm|mv|restore|filter-branch|gc)\b/i, "git is handled by the app"],
@@ -56,17 +59,45 @@ async function topFolders(root) {
  *   { type: "folder", folder }            -> only inside that existing folder
  * Reads are confined to the repo. `emit` receives chat events ({ kind: "assistant" | "tool", text }).
  */
-/** The user's own rule sets from Settings, appended to every prompt. */
-export function rulesBlock(rules = []) {
+/**
+ * The user's own rule sets from Settings. They go first (Claude reads them before the task),
+ * override the app's default format and style, and end with a check Claude must do before replying.
+ * They are also put in the system prompt, so they hold for every follow-up in a chat.
+ */
+const HARD_REQUIREMENTS = `- Each idea README keeps a "## Status" section whose first line starts with exactly one of 🔴, 🟡 or 🟢 and a bold label (the app reads this line to show the status light). This is the only place an emoji is required, even if a rule bans emoji.
+- Files go only where the task below says (the idea's folder, or the linked project).`;
+
+export function rulesSections(rules = []) {
   const active = rules.filter((r) => r && r.enabled !== false && String(r.text || "").trim());
-  if (!active.length) return "";
-  return `\n\nThe user has set rules in their settings. Follow them in everything you write or change, unless the request above explicitly asks for something else:\n${active
-    .map((r) => `<rule_set title="${String(r.title || "Rules").replace(/"/g, "'")}">\n${String(r.text).trim()}\n</rule_set>`)
-    .join("\n")}`;
+  if (!active.length) return { head: "", tail: "", system: "", titles: [] };
+  const sets = active.map((r) => `<rule_set title="${String(r.title || "Rules").replace(/"/g, "'")}">\n${String(r.text).trim()}\n</rule_set>`).join("\n");
+  const titles = active.map((r) => r.title || "Rules");
+  const system = `The user has written rule sets that apply to everything you build or write for them. Read them before you start, and follow them. Where a rule conflicts with a default format, structure or style the task asks for, the rule wins. Only these requirements stay, whatever the rules say:
+${HARD_REQUIREMENTS}
+
+${sets}`;
+  const head = `Before you start: read the user's rule sets below (${titles.join(", ")}). They apply to everything you write in this task, and where a rule conflicts with a default format, section list or style described in the task, the rule wins. Only these requirements stay:
+${HARD_REQUIREMENTS}
+
+${sets}
+
+The task:
+`;
+  const tail = `
+
+Before you reply: go through each rule set (${titles.join(", ")}) and check every file you created or changed against each rule. Fix anything that breaks a rule. Then end your reply with one short line saying which rule sets you applied.`;
+  return { head, tail, system, titles };
+}
+
+/** Kept for callers/tests that want the rules as one block. */
+export function rulesBlock(rules = []) {
+  const s = rulesSections(rules);
+  return s.head + s.tail;
 }
 
 async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules = [], allowCommands = false, log, emit }) {
-  const prompt = (basePrompt + rulesBlock(rules))
+  const rs = rulesSections(rules);
+  const prompt = (rs.head + basePrompt + rs.tail)
     .replaceAll(RULES, allowCommands ? RULES_SHELL : RULES_NO_SHELL)
     .replaceAll(CHECKS, allowCommands ? CHECKS_SHELL : CHECKS_NO_SHELL);
   if (rules.length) log(`Rules: ${rules.map((r) => r.title || "untitled").join(", ")}`);
@@ -144,6 +175,8 @@ async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules
       options: {
         cwd,
         ...(clone ? { additionalDirectories: [root] } : {}),
+        // Rules also live in the system prompt; snapshot: false so edited rules apply to existing chats too.
+        ...(rs.system ? { systemPrompt: { type: "preset", preset: "claude_code", append: rs.system, snapshot: false } } : {}),
         model: model || undefined,
         allowedTools: [],
         disallowedTools: allowCommands ? ["WebFetch", "WebSearch", "Task", "Agent"] : ["Bash", "PowerShell", "WebFetch", "WebSearch", "Task", "Agent"],
@@ -253,11 +286,17 @@ ${await example()}
 }
 
 /** Follow-up: Claude changes an existing idea, only inside its folder. */
-export async function reviseIdea({ repoPath, folder, message, sessionId, model, rules = [], allowCommands = false, log, emit = () => {}, clone = null, cloneLabel = "" }) {
+export async function reviseIdea({ repoPath, folder, message, sessionId, model, rules = [], allowCommands = false, log, emit = () => {}, clone = null, cloneLabel = "", demo = null }) {
   const root = path.resolve(repoPath);
-  if (FAKE()) return fakeRevise({ root, folder, message, log, emit, clone, cloneLabel });
+  if (FAKE()) return fakeRevise({ root, folder, message, log, emit, clone, cloneLabel, demo });
   if (clone) {
     const ideaDir = path.join(root, folder);
+    const demoPath = path.join(ideaDir, "demo.html");
+    const demoRule = demo?.projectEntry
+      ? `- The preview panel shows the project's own page \`${demo.projectEntry}\`; keep it working.`
+      : demo?.exists
+        ? `- ${demoSpec(demoPath, cloneLabel)} If your change affects what the demo shows, update the demo too, so the preview always matches the project.`
+        : `- ${demoSpec(demoPath, cloneLabel)} It doesn't exist yet: create it as part of this task (also when the request is only about code), so the user has something to try in the preview.`;
     const prompt = `You're working on the user's project ${cloneLabel}. Its code is in your current working directory (a git clone of that repository). The project is also one of the user's daily ideas; its idea notes are in \`${ideaDir}${path.sep}README.md\`, in a separate ideas repository.
 
 If you haven't looked at the project in this conversation yet, read its README and the relevant code first.
@@ -271,6 +310,7 @@ Rules:
 - Make code changes in the project (your working directory). Keep changes focused on the request and match the project's existing style.
 - ${CHECKS}
 - If the change affects what the idea notes say (what works, status, next steps), update \`${ideaDir}${path.sep}README.md\` too. Keep its format. ${STATUS_RULE}
+${demoRule}
 - Don't change anything else in the ideas repository.
 - If the request is only a question, answer it and don't change files.
 - ${RULES} The app commits your changes to ${cloneLabel} and pushes them.
@@ -319,10 +359,11 @@ ${await example()}
 }
 
 /** Linked repo: Claude reads the clone and writes the idea README in the ideas repo. The clone isn't changed. */
-export async function describeLinked({ repoPath, folder, clone, cloneLabel, date, model, rules = [], allowCommands = false, log, emit = () => {} }) {
+export async function describeLinked({ repoPath, folder, clone, cloneLabel, date, model, rules = [], allowCommands = false, log, emit = () => {}, needsDemo = false }) {
   const root = path.resolve(repoPath);
-  if (FAKE()) return fakeDescribe({ root, folder, source: cloneLabel, date, log, emit, linked: true });
+  if (FAKE()) return fakeDescribe({ root, folder, source: cloneLabel, date, log, emit, linked: true, needsDemo });
   const ideaReadme = path.join(root, folder, "README.md");
+  const demoPath = path.join(root, folder, "demo.html");
   const prompt = `The user has linked their project ${cloneLabel} as one of their daily ideas. Its code is in your current working directory (a git clone). Their ideas live in a separate repository, and this idea's folder is \`${path.join(root, folder)}\`.
 
 Write \`${ideaReadme}\` so it fits in with the other ideas:
@@ -331,9 +372,10 @@ Write \`${ideaReadme}\` so it fits in with the other ideas:
 3. "## The prototype" should say briefly where things are in the project, and "### Run it" should give the real commands to run it from a clone of the repository.
 4. ${STATUS_RULE} Judge it honestly from the code.
 5. If you notice something clearly broken (for example leftover merge-conflict markers), mention it under "## Next steps".
-6. Write only that README. Don't change the project's files. ${RULES}
+${needsDemo ? `6. The project has no page that runs in a browser as it is, so also write the demo: ${demoSpec(demoPath, cloneLabel)}
+7.` : "6."} Write only ${needsDemo ? "those two files" : "that README"}. Don't change the project's files. ${RULES}
 
-Reply in 1-3 short sentences: what the project is, the status you gave it, and anything that looked broken.
+Reply in 1-3 short sentences: what the project is, the status you gave it, ${needsDemo ? "what the demo lets you try, " : ""}and anything that looked broken.
 
 Example README:
 <example_readme>
@@ -373,16 +415,24 @@ async function fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, 
   return { folder, sessionId: `fake-${folder}`, reply: `[fake] Built a test page for “${idea.slice(0, 40)}”.` };
 }
 
-async function fakeRevise({ root, folder, message, log, emit, clone, cloneLabel }) {
+async function fakeRevise({ root, folder, message, log, emit, clone, cloneLabel, demo }) {
   const file = clone ? path.join(clone, "CHANGES.md") : path.join(root, folder, "CHANGES.md");
   const shown = clone ? `${cloneLabel}/CHANGES.md` : `${folder}/CHANGES.md`;
   await fs.appendFile(file, `- ${message}\n`);
   log(`Write ${shown}`);
   emit({ kind: "tool", text: `Edited ${shown}` });
+  if (clone && demo && !demo.projectEntry && !demo.exists) await fakeDemo(root, folder, log, emit);
   return { folder, sessionId: `fake-${folder}`, reply: `[fake] Noted: ${message}` };
 }
 
-async function fakeDescribe({ root, folder, source, date, log, emit, linked = false }) {
+async function fakeDemo(root, folder, log, emit) {
+  await fs.writeFile(path.join(root, folder, "demo.html"), `<!doctype html><title>Demo</title><p>Demo with dummy data (test).</p>\n`);
+  log(`Write ${folder}/demo.html`);
+  emit({ kind: "tool", text: `Wrote ${folder}/demo.html` });
+}
+
+async function fakeDescribe({ root, folder, source, date, log, emit, linked = false, needsDemo = false }) {
+  if (needsDemo) await fakeDemo(root, folder, log, emit);
   const readme = path.join(root, folder, "README.md");
   const old = await fs.readFile(readme, "utf8").catch(() => null);
   if (old !== null && !linked) await fs.writeFile(path.join(root, folder, "ORIGINAL-README.md"), old);

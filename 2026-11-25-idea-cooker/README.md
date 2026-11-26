@@ -71,6 +71,9 @@ That runs the whole flow (cook, follow-up, import, change status, with a push af
 - [x] Let Claude run commands (tests, scripts, local servers) to check its own work; opt-in in Settings, with git, publishing, global installs and system commands blocked
 - [x] Rule sets in Settings (a headline plus rules) that Claude follows in everything it builds
 - [x] Remove ideas, and save ideas to build later
+- [x] Rules are read first, win over the default format, and are checked before Claude replies
+- [x] Resizable preview panel (drag the edge, or maximize)
+- [x] Linked repos that need a build step get a dummy-data demo.html in the preview
 - [ ] Show in the page whether Claude Code is logged in, before you cook
 - [ ] Stream Claude's reply word by word instead of showing it when it's done
 - [ ] Publish the prototypes with GitHub Pages and link them from the list

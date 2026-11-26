@@ -20,6 +20,7 @@ const PUBLIC_DIR = path.join(here, "public");
 // Clones of linked repos (git-ignored). Claude edits these, and the app pushes them to the original repos.
 const REPOS_DIR = process.env.IDEA_COOKER_REPOS || path.join(here, "repos");
 const FOLDER_RE = /^\d{4}-\d{2}-\d{2}-[\w.-]+$/;
+const DEMO_FILE = "demo.html"; // dummy-data demo for linked repos that can't be previewed as they are
 
 // ---------- config ----------
 async function loadConfig() {
@@ -181,7 +182,8 @@ async function handle(req, res) {
         const dir = cloneDir(REPOS_DIR, repo);
         const cloned = !!(await fs.stat(path.join(dir, ".git")).catch(() => null));
         i.repo = { label: repo.label, web: repo.web, cloned };
-        i.entry = cloned ? await staticEntry(dir) : null;
+        // Preview: the project's own static page if it has one, else the dummy-data demo in the idea folder.
+        i.entry = (cloned ? await staticEntry(dir) : null) || (i.files.includes(DEMO_FILE) ? DEMO_FILE : null);
         i.hasRepoReadme = cloned && !!(await fs.stat(path.join(dir, "README.md")).catch(() => null));
       } else {
         i.entry = entryOf(i.files);
@@ -233,7 +235,7 @@ async function handle(req, res) {
       job.folder = folder;
       let r;
       try {
-        r = await describeLinked({ repoPath: cfg.repoPath, folder, clone: dir, cloneLabel: repo.label, date, model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit });
+        r = await describeLinked({ repoPath: cfg.repoPath, folder, clone: dir, cloneLabel: repo.label, date, needsDemo: !(await staticEntry(dir)), model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit });
       } catch (e) {
         // Remove the half-made folder this job just created, so linking can be retried.
         await fs.rm(path.join(cfg.repoPath, folder), { recursive: true, force: true }).catch(() => {});
@@ -287,7 +289,8 @@ async function handle(req, res) {
         const link = await readLink(cfg.repoPath, folder);
         const repo = link ? parseRepoUrl(link.repo) : null;
         const clone = repo ? await ensureClone(REPOS_DIR, repo, log) : null;
-        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit, clone, cloneLabel: repo?.label });
+        const demo = clone ? { exists: !!(await fs.stat(path.join(cfg.repoPath, folder, DEMO_FILE)).catch(() => null)), projectEntry: await staticEntry(clone) } : null;
+        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, demo, model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit, clone, cloneLabel: repo?.label });
         const summary = text.split("\n")[0].slice(0, 72);
         let code = null;
         if (clone) code = await commitClone(clone, `${summary}\n\nMade with Idea Cooker.`, { push: cfg.push, log, label: repo.label });
@@ -382,11 +385,15 @@ async function handlePreview(req, res) {
   if (!m) throw httpError(404, "Not found");
   const folder = checkFolder(m[1]);
   const link = await readLink(cfg.repoPath, folder);
-  const base = link ? cloneDir(REPOS_DIR, parseRepoUrl(link.repo)) : path.join(cfg.repoPath, folder);
+  const ideaDir = path.join(cfg.repoPath, folder);
   let rel = m[2];
-  if (link && rel.split(/[\\/]/)[0] === ".git") throw httpError(403, "Forbidden");
   if (!rel || rel.endsWith("/")) rel += "index.html";
-  return serveFile(res, base, rel);
+  if (!link) return serveFile(res, ideaDir, rel);
+  if (rel.split(/[\\/]/)[0] === ".git") throw httpError(403, "Forbidden");
+  // Linked ideas: files come from the clone, with the idea folder (the dummy-data demo) as a fallback.
+  const clone = cloneDir(REPOS_DIR, parseRepoUrl(link.repo));
+  const inClone = await fs.stat(path.resolve(clone, rel)).catch(() => null);
+  return serveFile(res, inClone?.isFile() ? clone : ideaDir, rel);
 }
 
 const onError = (res) => (e) => {

@@ -59,6 +59,23 @@ await must(extWork, ["commit", "-m", "first"]);
 await must(extWork, ["push", "-u", "origin", "main"]);
 const extUrl = "file:///" + extBare.replaceAll("\\", "/");
 
+// A second project that can't run in a plain browser (Vite-style): linking it should produce a demo.
+const viteBare = path.join(tmp, "vite-app.git");
+const viteWork = path.join(tmp, "vite-work");
+await must(tmp, ["init", "--bare", "-b", "main", viteBare]);
+await must(tmp, ["clone", viteBare, viteWork]);
+await must(viteWork, ["config", "user.email", "test@example.com"]);
+await must(viteWork, ["config", "user.name", "e2e"]);
+await fs.mkdir(path.join(viteWork, "src"));
+await fs.writeFile(path.join(viteWork, "package.json"), '{"name":"vite-app","scripts":{"dev":"vite"}}\n');
+await fs.writeFile(path.join(viteWork, "index.html"), '<!doctype html><div id="root"></div><script type="module" src="/src/main.jsx"></script>\n');
+await fs.writeFile(path.join(viteWork, "src", "main.jsx"), "export const scale = (g, f) => g * f;\n");
+await fs.writeFile(path.join(viteWork, "README.md"), "# Vite App\n\nScales recipes.\n");
+await must(viteWork, ["add", "."]);
+await must(viteWork, ["commit", "-m", "first"]);
+await must(viteWork, ["push", "-u", "origin", "main"]);
+const viteUrl = "file:///" + viteBare.replaceAll("\\", "/");
+
 const server = spawn(process.execPath, [path.join(here, "..", "server.mjs")], {
   env: { ...process.env, PORT: String(PORT), PREVIEW_PORT: String(PREVIEW), IDEA_COOKER_CONFIG: path.join(tmp, "config.json"), IDEA_COOKER_CHATS: path.join(tmp, "chats"), IDEA_COOKER_REPOS: path.join(tmp, "repos"), IDEA_COOKER_FAKE: real ? "" : "1" },
   stdio: ["ignore", "pipe", "inherit"],
@@ -100,6 +117,7 @@ try {
   ok(cfgBack.rules[0].title === "UI" && cfgBack.rules[1].enabled === false, "rule sets come back from settings");
   const block = rulesBlock(cfgBack.rules);
   ok(block.includes('<rule_set title="UI">') && block.includes("8px grid") && !block.includes("French"), "only rule sets that are on go into the prompt");
+  ok(block.startsWith("Before you start") && block.includes("the rule wins") && block.includes("Before you reply"), "rules come first, override defaults, and end with a check");
 
   // --- "Let Claude run commands": a setting, plus commands that stay blocked
   ok((await api("POST", "/api/config", { allowCommands: true })).allowCommands === true, "commands can be turned on in settings");
@@ -177,6 +195,21 @@ try {
   ok(gitPeek.status === 403, "the clone's .git folder isn't served");
   const repoReadme = await api("GET", `/api/ideas/${linked}/readme?which=repo`);
   ok(/counter|reset/i.test(repoReadme.text), "panel can show the linked repo's own README");
+  ok(!(await must(remote, ["ls-tree", "-r", "--name-only", "main", linked])).includes("demo.html"), "a repo with its own page gets no extra demo");
+
+  // --- a linked repo that needs a build step gets a dummy-data demo, shown in the preview
+  job = await waitJob((await api("POST", "/api/link", { source: viteUrl })).jobId);
+  printLog(job);
+  ok(job.state === "done", `linked the Vite-style app (${job.error || job.result.folder})`);
+  const viteIdea = job.result.folder;
+  ok((await must(remote, ["ls-tree", "-r", "--name-only", "main", viteIdea])).includes(`${viteIdea}/demo.html`), "its demo.html is in the ideas repo");
+  ideas = await api("GET", "/api/ideas");
+  ok(ideas.find((i) => i.folder === viteIdea)?.entry === "demo.html", "the preview's entry is the demo");
+  const demoPage = await fetch(`http://localhost:${PREVIEW}/${viteIdea}/demo.html`);
+  ok(demoPage.ok && /demo/i.test(await demoPage.text()), "the demo is served from the idea folder");
+  const projPage = await fetch(`http://localhost:${PREVIEW}/${viteIdea}/README.md`);
+  ok(projPage.ok && /Vite App/.test(await projPage.text()), "the project's own files are still served from its clone");
+  ok(!(await must(viteBare, ["ls-tree", "-r", "--name-only", "main"])).includes("demo.html"), "the demo is not added to the project's repo");
 
   // --- save an idea without building it
   job = await waitJob((await api("POST", "/api/chat", { message: "A mug that tells you when your coffee is drinkable", saveOnly: true })).jobId);
