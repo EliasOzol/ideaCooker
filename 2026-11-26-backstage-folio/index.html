@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Backstage Folio</title>
+<style>
+  :root {
+    --bg: #f4f2ed;
+    --paper: #fbfaf7;
+    --surface: #ffffff;
+    --sunk: #ebe8e1;
+    --ink: #1d1b18;
+    --muted: #6b665d;
+    --line: #e2ded5;
+    --accent: #c2410c;
+    --ring: rgba(194, 65, 12, .22);
+    --danger: #b42318;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141311;
+      --paper: #1b1a17;
+      --surface: #211f1c;
+      --sunk: #2a2824;
+      --ink: #eeeae2;
+      --muted: #a29c91;
+      --line: #322f2a;
+      --accent: #fb923c;
+      --ring: rgba(251, 146, 60, .28);
+      --danger: #f97066;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
+  [hidden] { display: none !important; }
+  h1, h2, h3, p { margin: 0; }
+
+  /* Top bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 24px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { font: 600 17px/1.2 var(--serif); }
+  .brand small { display: block; font: 400 12px/1.4 var(--sans); color: var(--muted); }
+  .switch { display: inline-flex; padding: 4px; background: var(--sunk); border-radius: 999px; }
+  .switch a {
+    padding: 6px 16px; border-radius: 999px;
+    color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500;
+    transition: background .15s, color .15s;
+  }
+  .switch a:hover { color: var(--ink); }
+  .switch a[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+
+  /* Controls */
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 36px; padding: 0 16px;
+    font: 500 14px/1 var(--sans); color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    cursor: pointer; transition: background .15s, border-color .15s, transform .1s;
+  }
+  .btn:hover:not(:disabled) { background: var(--sunk); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 85%, var(--bg)); }
+  .btn.icon { width: 36px; padding: 0; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+  .link-btn {
+    padding: 4px 0; background: none; border: 0; cursor: pointer;
+    font: 500 13px/1.4 var(--sans); color: var(--muted);
+    text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+    transition: color .15s, text-decoration-color .15s;
+  }
+  .link-btn:hover { color: var(--ink); text-decoration-color: currentColor; }
+
+  .field { display: grid; gap: 4px; }
+  .field > span { font-size: 13px; font-weight: 500; color: var(--muted); display: flex; justify-content: space-between; }
+  .field input, .field textarea {
+    width: 100%; padding: 8px 12px;
+    font: inherit; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field textarea { resize: vertical; line-height: 1.55; }
+  .field input:hover, .field textarea:hover { border-color: color-mix(in srgb, var(--muted) 45%, var(--line)); }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+  .field .count { font-weight: 400; font-variant-numeric: tabular-nums; }
+  .field .count.over { color: var(--danger); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* Maker layout */
+  .maker {
+    display: grid; grid-template-columns: minmax(320px, 440px) minmax(0, 1fr); gap: 32px;
+    max-width: 1320px; margin: 0 auto; padding: 24px;
+    align-items: start;
+  }
+  .backstage { display: grid; gap: 32px; }
+  .group { display: grid; gap: 16px; }
+  .group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .group h2 { font: 600 16px/1.3 var(--sans); }
+  .meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hint { font-size: 13px; color: var(--muted); }
+
+  /* Project list */
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .list li {
+    display: flex; align-items: center; gap: 4px;
+    border-radius: 10px; background: transparent;
+    transition: background .15s, box-shadow .15s, opacity .15s;
+  }
+  .list li:hover { background: var(--surface); }
+  .list li.selected { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), inset 3px 0 0 var(--accent); }
+  .list li.dragging { opacity: .4; }
+  .list li.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+  .list li.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+  .handle { display: grid; place-items: center; width: 24px; height: 48px; margin-left: 4px; color: var(--muted); cursor: grab; opacity: .6; }
+  .handle:active { cursor: grabbing; }
+  .row-btn {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 8px 8px 0;
+    background: none; border: 0; border-radius: 8px; text-align: left; color: inherit; font: inherit; cursor: pointer;
+  }
+  .row-text { flex: 1; min-width: 0; display: grid; }
+  .row-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-sum { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list li.is-hidden .row-title, .list li.is-hidden .cover { opacity: .5; }
+  .pill { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--sunk); color: var(--muted); }
+  .pill.accent { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+
+  /* Editor */
+  .order-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 14px; cursor: pointer; }
+  .toggle input { appearance: none; width: 36px; height: 20px; margin: 0; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .15s; }
+  .toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s var(--ease); }
+  .toggle input:checked { background: var(--accent); }
+  .toggle input:checked::after { transform: translateX(16px); }
+  .hues { display: flex; gap: 8px; border: 0; padding: 0; margin: 0; }
+  .hues legend { font-size: 13px; font-weight: 500; color: var(--muted); padding: 0; margin-bottom: 4px; }
+  .hues label { position: relative; cursor: pointer; }
+  .hues input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .hues .dot { display: block; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, hsl(var(--h) 65% 60%), hsl(calc(var(--h) + 35) 60% 38%)); transition: transform .15s, box-shadow .15s; }
+  .hues label:hover .dot { transform: scale(1.08); }
+  .hues input:checked + .dot { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
+  .hues input:focus-visible + .dot { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+  .editor-foot { display: flex; justify-content: flex-end; }
+  .empty-editor { padding: 24px; border-radius: 12px; background: var(--sunk); color: var(--muted); font-size: 14px; }
+
+  .utility { display: flex; flex-wrap: wrap; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+  /* Preview */
+  .preview { position: sticky; top: 88px; display: grid; gap: 12px; }
+  .preview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .preview-head h2 { font: 600 16px/1.3 var(--sans); }
+  .preview-head a { font-size: 13px; font-weight: 500; color: var(--muted); text-underline-offset: 3px; }
+  .preview-head a:hover { color: var(--ink); }
+  .stage-frame {
+    max-height: calc(100vh - 136px); overflow: auto;
+    border-radius: 16px; background: var(--paper);
+    box-shadow: 0 0 0 1px var(--line), 0 16px 40px -24px rgba(0,0,0,.25);
+  }
+
+  /* Stage (viewer rendering, shared by preview and viewer page) */
+  .stage { container-type: inline-size; padding: 48px 40px 56px; }
+  .st-head { margin-bottom: 40px; }
+  .st-role { font: 500 13px/1.4 var(--sans); color: var(--accent); margin-bottom: 8px; }
+  .st-name { font: 600 40px/1.1 var(--serif); letter-spacing: -.01em; margin-bottom: 16px; }
+  .st-intro { font-size: 17px; line-height: 1.6; color: var(--muted); max-width: 56ch; }
+  .feature {
+    display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: center;
+    width: 100%; padding: 0; margin-bottom: 48px;
+    background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  }
+  .feature .cover { aspect-ratio: 4 / 3; border-radius: 12px; }
+  .feature-text { display: grid; gap: 8px; }
+  .kicker { font: 500 13px/1.4 var(--sans); color: var(--muted); }
+  .feature-title { font: 600 28px/1.2 var(--serif); }
+  .feature-sum { font-size: 16px; line-height: 1.55; color: var(--muted); }
+  .more { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent); display: inline-flex; gap: 4px; }
+  .more i { font-style: normal; transition: transform .2s var(--ease); }
+  .feature:hover .cover { transform: scale(1.015); }
+  .feature:hover .more i { transform: translateX(4px); }
+  .st-sub { font: 600 20px/1.3 var(--serif); margin-bottom: 8px; }
+  .index { list-style: none; margin: 0; padding: 0; }
+  .index li + li { border-top: 1px solid var(--line); }
+  .index button {
+    display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 16px;
+    width: 100%; padding: 16px 8px; margin: 0 -8px; box-sizing: content-box;
+    background: none; border: 0; border-radius: 10px; color: inherit; font: inherit; text-align: left; cursor: pointer;
+    transition: background .15s;
+  }
+  .index button:hover { background: var(--sunk); }
+  .index-title { display: block; font: 600 17px/1.3 var(--serif); }
+  .index-sum { display: block; font-size: 14px; color: var(--muted); }
+  .index-year { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .st-empty { padding: 48px 24px; text-align: center; color: var(--muted); border-radius: 12px; background: var(--sunk); }
+  @container (max-width: 560px) {
+    .stage { padding: 32px 20px 40px; }
+    .st-name { font-size: 32px; }
+    .feature { grid-template-columns: 1fr; gap: 16px; }
+    .index button { grid-template-columns: 48px minmax(0, 1fr); }
+    .index .cover.sm { width: 48px; height: 48px; }
+    .index-year { display: none; }
+  }
+
+  /* Generated covers */
+  .cover {
+    position: relative; overflow: hidden; flex: none;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, hsl(var(--h) 65% 60%), hsl(calc(var(--h) + 35) 60% 38%));
+    transition: transform .3s var(--ease);
+  }
+  .cover::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, rgba(255,255,255,.09) 0 2px, transparent 2px 12px); }
+  .cover > span { position: relative; z-index: 1; font-family: var(--serif); font-weight: 600; color: rgba(255,255,255,.94); letter-spacing: -.02em; }
+  .cover.xs { width: 32px; height: 32px; border-radius: 6px; }
+  .cover.xs > span { font-size: 13px; }
+  .cover.sm { width: 56px; height: 56px; border-radius: 8px; }
+  .cover.sm > span { font-size: 20px; }
+  .cover.lg > span { font-size: 72px; }
+  .cover.xl { width: 100%; aspect-ratio: 16 / 7; }
+  .cover.xl > span { font-size: 72px; }
+
+  /* Viewer page */
+  .viewer { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+  .viewer .stage { padding-top: 48px; }
+
+  /* Detail panel */
+  dialog#detail {
+    margin: 0 0 0 auto; padding: 0; border: 0;
+    width: min(560px, 100%); height: 100%; max-height: 100%; max-width: 100%;
+    background: var(--paper); color: var(--ink);
+    box-shadow: -24px 0 48px -24px rgba(0,0,0,.35);
+  }
+  dialog#detail[open] { animation: slide-in .28s var(--ease); }
+  dialog#detail::backdrop { background: rgba(20, 18, 15, .45); }
+  @keyframes slide-in { from { transform: translateX(32px); opacity: 0; } }
+  .d-inner { height: 100%; overflow: auto; display: flex; flex-direction: column; }
+  .d-cover { position: relative; }
+  .d-close {
+    position: absolute; top: 16px; right: 16px; z-index: 2;
+    width: 40px; height: 40px; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.35); color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
+    transition: background .15s;
+  }
+  .d-close:hover { background: rgba(0,0,0,.55); }
+  .d-body { padding: 32px 32px 24px; display: grid; gap: 16px; flex: 1; align-content: start; }
+  .d-title { font: 600 32px/1.15 var(--serif); }
+  .d-sum { font-size: 17px; line-height: 1.55; color: var(--muted); }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .d-desc { display: grid; gap: 16px; font-size: 16px; line-height: 1.65; max-width: 60ch; }
+  .d-desc ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+  .d-link { justify-self: start; }
+  .d-nav { display: flex; justify-content: space-between; gap: 16px; padding: 16px 32px 32px; }
+  .d-nav .btn { max-width: 48%; }
+  .d-nav .btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; z-index: 20;
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 12px 12px 16px; border-radius: 12px;
+    background: var(--ink); color: var(--bg); font-size: 14px;
+    box-shadow: 0 12px 32px -12px rgba(0,0,0,.4);
+    transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+    transition: transform .2s var(--ease), opacity .2s;
+  }
+  .toast.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .toast button { padding: 6px 12px; border: 0; border-radius: 8px; background: color-mix(in srgb, var(--bg) 18%, transparent); color: inherit; font: 600 14px/1 var(--sans); cursor: pointer; }
+  .toast button:hover { background: color-mix(in srgb, var(--bg) 30%, transparent); }
+
+  @media (max-width: 880px) {
+    .maker { grid-template-columns: 1fr; padding: 16px; gap: 40px; }
+    .preview { position: static; }
+    .stage-frame { max-height: none; }
+    .topbar { padding: 12px 16px; }
+  }
+  @media (max-width: 420px) {
+    .brand small { display: none; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .d-body { padding: 24px 20px 16px; }
+    .d-nav { padding: 16px 20px 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Backstage Folio<small id="modeHint">Editing the portfolio</small></div>
+  <nav class="switch" aria-label="Page">
+    <a href="#maker" data-mode="maker">Maker</a>
+    <a href="#view" data-mode="view">Viewer</a>
+  </nav>
+</header>
+
+<main id="maker" class="maker">
+  <section class="backstage" aria-label="Maker controls">
+    <div class="group">
+      <h2>Profile</h2>
+      <div class="grid-2">
+        <label class="field"><span>Name</span><input id="pName" autocomplete="off"></label>
+        <label class="field"><span>Headline</span><input id="pRole" autocomplete="off"></label>
+      </div>
+      <label class="field"><span>Intro</span><textarea id="pIntro" rows="3"></textarea></label>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h2>Projects</h2><span class="meta" id="count"></span></div>
+      <p class="hint">Drag to reorder, or use Alt + ↑/↓ on a selected row. The first shown project is featured.</p>
+      <ol class="list" id="list"></ol>
+      <div><button class="btn primary" id="add">Add project</button></div>
+    </div>
+
+    <div class="group" id="editor" aria-live="polite"></div>
+
+    <div class="utility">
+      <button class="link-btn" id="export">Export JSON</button>
+      <button class="link-btn" id="importBtn">Import JSON</button>
+      <button class="link-btn" id="reset">Reset to sample</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+  </section>
+
+  <section class="preview" aria-label="Viewer preview">
+    <div class="preview-head">
+      <h2>What viewers see</h2>
+      <a href="#view" target="_blank" rel="noopener">Open viewer in a new tab</a>
+    </div>
+    <div class="stage-frame"><div class="stage" id="previewStage"></div></div>
+  </section>
+</main>
+
+<main id="viewer" class="viewer" hidden>
+  <div class="stage" id="viewStage"></div>
+</main>
+
+<dialog id="detail" aria-labelledby="dTitle">
+  <div class="d-inner">
+    <div class="d-cover"><button class="d-close" id="dClose" aria-label="Close">×</button><div id="dCover"></div></div>
+    <div class="d-body">
+      <p class="kicker" id="dMeta"></p>
+      <h2 class="d-title" id="dTitle"></h2>
+      <p class="d-sum" id="dSum"></p>
+      <div class="tags" id="dTags"></div>
+      <div class="d-desc" id="dDesc"></div>
+      <a class="btn d-link" id="dLink" target="_blank" rel="noopener">Visit project ↗</a>
+    </div>
+    <nav class="d-nav" aria-label="Other projects">
+      <button class="btn" id="dPrev"><span></span></button>
+      <button class="btn" id="dNext"><span></span></button>
+    </nav>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
+
+<script>
+const KEY = 'backstage-folio-v1';
+const HUES = [14, 38, 150, 195, 250, 320];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+function seed() {
+  return {
+    profile: {
+      name: 'Elias',
+      role: 'One small idea a day',
+      intro: 'Every day I write down one idea and build a working prototype for it. These are the ones worth a closer look.'
+    },
+    items: [
+      { id: uid(), title: 'Idea Cooker', year: '2026', hue: 14, hidden: false, link: '',
+        tags: ['AI', 'Local tool'],
+        summary: 'A local chat that turns one written idea into a README and a working prototype.',
+        description: 'I write down one idea a day. Idea Cooker takes that sentence, picks a name, writes a README and builds a small prototype in a dated folder of my daily-ideas repo.\n\nIt runs as a local chat on my PC at home, and commits and pushes each new folder by itself.\n\n- One idea in, one folder out\n- README with a status and next steps\n- A prototype that opens with a double-click' },
+      { id: uid(), title: 'BrainReminder', year: '2026', hue: 150, hidden: false, link: '',
+        tags: ['Health', 'Web app'],
+        summary: 'A break alarm where snoozing makes the next challenge bigger.',
+        description: 'Every so often an alarm goes off with a small physical challenge: five squats, a glass of water, a minute of walking.\n\nYou can snooze, but the challenge accrues interest. Snooze "5 squats" for ten minutes and it comes back as 8. Paying off break debt early is always cheaper.\n\n- Snooze 5 min: +25% interest\n- Snooze 10 min: +60% interest, compounding\n- Daily streak of completed breaks, saved in the browser' },
+      { id: uid(), title: 'Backstage Folio', year: '2026', hue: 250, hidden: false, link: '',
+        tags: ['Web app', 'Portfolio'],
+        summary: 'A portfolio with a maker side for editing and a viewer side for showing.',
+        description: 'The maker page adds, removes and reorders projects and decides which one is featured. The viewer page shows the same list read-only, in that order.\n\nBoth pages read the same data, so a change backstage shows up on stage right away, even in another tab.\n\nNext: fold it into Idea Cooker so a finished idea can be published here with one click.' },
+      { id: uid(), title: 'BrainReminder Desk Button', year: '2026', hue: 38, hidden: true, link: '',
+        tags: ['Hardware', 'ESP32'],
+        summary: 'An ESP32 with a buzzer and one big snooze button.',
+        description: 'A physical version of BrainReminder. The ESP32 runs the timer, the buzzer goes off, and the only way to silence it is the button, which still adds interest.\n\nStill a sketch. Hidden until there is a build to show.' }
+    ]
+  };
+}
+
+function normalize(data) {
+  if (!data || !Array.isArray(data.items)) throw new Error('No items list');
+  const p = data.profile || {};
+  return {
+    profile: { name: String(p.name ?? ''), role: String(p.role ?? ''), intro: String(p.intro ?? '') },
+    items: data.items.map((it, i) => ({
+      id: String(it.id || uid()),
+      title: String(it.title ?? ''),
+      summary: String(it.summary ?? ''),
+      description: String(it.description ?? ''),
+      year: String(it.year ?? ''),
+      tags: Array.isArray(it.tags) ? it.tags.map(String) : [],
+      link: String(it.link ?? ''),
+      hue: Number.isFinite(+it.hue) ? +it.hue : HUES[i % HUES.length],
+      hidden: !!it.hidden
+    }))
+  };
+}
+
+function load() {
+  try { const raw = localStorage.getItem(KEY); return raw ? normalize(JSON.parse(raw)) : null; }
+  catch { return null; }
+}
+
+let state = load() || seed();
+let selectedId = state.items[0]?.id ?? null;
+let mode = 'maker';
+
+const persist = () => localStorage.setItem(KEY, JSON.stringify(state));
+const selected = () => state.items.find(i => i.id === selectedId);
+const visible = () => state.items.filter(i => !i.hidden);
+const titleOf = it => it.title.trim() || 'Untitled project';
+
+function initials(t) {
+  const words = t.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '·';
+  if (words.length === 1) {
+    const caps = words[0].match(/[A-Z]/g);
+    return caps && caps.length > 1 ? caps.slice(0, 2).join('') : words[0][0].toUpperCase();
+  }
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+const cover = (it, size) => `<span class="cover ${size}" style="--h:${+it.hue}" aria-hidden="true"><span>${esc(initials(it.title))}</span></span>`;
+
+/* ---------- Mode ---------- */
+function applyMode() {
+  mode = location.hash === '#view' ? 'view' : 'maker';
+  document.body.dataset.mode = mode;
+  $('#maker').hidden = mode !== 'maker';
+  $('#viewer').hidden = mode !== 'view';
+  $('#modeHint').textContent = mode === 'maker' ? 'Editing the portfolio' : 'Read-only view';
+  document.querySelectorAll('.switch a').forEach(a => {
+    if (a.dataset.mode === mode) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+  document.title = mode === 'maker' ? 'Backstage Folio · Maker' : (state.profile.name || 'Portfolio');
+  renderStages();
+}
+
+/* ---------- Rendering ---------- */
+function renderAll() { renderProfile(); renderList(); renderEditor(); renderStages(); }
+
+function renderProfile() {
+  $('#pName').value = state.profile.name;
+  $('#pRole').value = state.profile.role;
+  $('#pIntro').value = state.profile.intro;
+}
+
+function renderList() {
+  const firstVisible = visible()[0];
+  $('#list').innerHTML = state.items.map(it => `
+    <li data-id="${esc(it.id)}" draggable="true" class="${it.id === selectedId ? 'selected' : ''} ${it.hidden ? 'is-hidden' : ''}">
+      <span class="handle" aria-hidden="true"><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="3" r="1.5"/><circle cx="8" cy="3" r="1.5"/><circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="2" cy="13" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg></span>
+      <button class="row-btn" data-select="${esc(it.id)}" aria-pressed="${it.id === selectedId}">
+        ${cover(it, 'xs')}
+        <span class="row-text"><span class="row-title">${esc(titleOf(it))}</span><span class="row-sum">${esc(it.summary || 'No summary yet')}</span></span>
+        ${it.hidden ? '<span class="pill">Hidden</span>' : ''}
+        ${it === firstVisible ? '<span class="pill accent">Featured</span>' : ''}
+      </button>
+    </li>`).join('');
+  const shown = visible().length, hidden = state.items.length - shown;
+  $('#count').textContent = `${shown} shown${hidden ? ` · ${hidden} hidden` : ''}`;
+}
+
+function renderEditor() {
+  const ed = $('#editor');
+  const it = selected();
+  if (!it) {
+    ed.innerHTML = `<div class="empty-editor">Select a project to edit it, or add a new one.</div>`;
+    return;
+  }
+  const i = state.items.indexOf(it), n = state.items.length;
+  ed.innerHTML = `
+    <div class="group-head"><h2>Edit project</h2><span class="meta">Position ${i + 1} of ${n}</span></div>
+    <div class="order-tools">
+      <button class="btn" data-act="top" ${i === 0 ? 'disabled' : ''}>Move to top</button>
+      <button class="btn icon" data-act="up" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button class="btn icon" data-act="down" aria-label="Move down" ${i === n - 1 ? 'disabled' : ''}>↓</button>
+      <label class="toggle"><input type="checkbox" data-f="shown" ${it.hidden ? '' : 'checked'}> Shown</label>
+    </div>
+    <div class="grid-2">
+      <label class="field"><span>Title</span><input data-f="title" value="${esc(it.title)}" placeholder="Project name" autocomplete="off"></label>
+      <label class="field"><span>Year</span><input data-f="year" value="${esc(it.year)}" inputmode="numeric" autocomplete="off"></label>
+    </div>
+    <label class="field"><span>Preview line <span class="count" id="sumCount"></span></span><input data-f="summary" value="${esc(it.summary)}" placeholder="What it is, in one sentence" autocomplete="off"></label>
+    <label class="field"><span>Full description</span><textarea data-f="description" rows="7" placeholder="Shown when a viewer opens the project. Blank line = new paragraph, “- ” = bullet.">${esc(it.description)}</textarea></label>
+    <div class="grid-2">
+      <label class="field"><span>Tags</span><input data-f="tags" value="${esc(it.tags.join(', '))}" placeholder="Comma separated" autocomplete="off"></label>
+      <label class="field"><span>Link</span><input data-f="link" type="url" value="${esc(it.link)}" placeholder="https://" autocomplete="off"></label>
+    </div>
+    <fieldset class="hues"><legend>Cover colour</legend>
+      ${HUES.map(h => `<label><input type="radio" name="hue" data-f="hue" value="${h}" ${h === it.hue ? 'checked' : ''} aria-label="Hue ${h}"><span class="dot" style="--h:${h}"></span></label>`).join('')}
+    </fieldset>
+    <div class="editor-foot"><button class="btn danger" data-act="remove">Remove project</button></div>`;
+  updateSumCount();
+}
+
+function updateSumCount() {
+  const it = selected(), el = $('#sumCount');
+  if (!it || !el) return;
+  el.textContent = `${it.summary.length}/90`;
+  el.classList.toggle('over', it.summary.length > 90);
+}
+
+function renderStage(root) {
+  const items = visible();
+  const p = state.profile;
+  const [first, ...rest] = items;
+  root.innerHTML = `
+    <header class="st-head">
+      ${p.role ? `<p class="st-role">${esc(p.role)}</p>` : ''}
+      <h1 class="st-name">${esc(p.name || 'Portfolio')}</h1>
+      ${p.intro ? `<p class="st-intro">${esc(p.intro)}</p>` : ''}
+    </header>
+    ${!first ? `<p class="st-empty">Nothing on show yet.</p>` : `
+      <button class="feature" data-open="${esc(first.id)}">
+        ${cover(first, 'lg')}
+        <span class="feature-text">
+          <span class="kicker">Featured${first.year ? ` · ${esc(first.year)}` : ''}</span>
+          <span class="feature-title">${esc(titleOf(first))}</span>
+          ${first.summary ? `<span class="feature-sum">${esc(first.summary)}</span>` : ''}
+          <span class="more">Read more <i>→</i></span>
+        </span>
+      </button>
+      ${rest.length ? `<h2 class="st-sub">More work</h2>
+      <ol class="index">${rest.map(it => `
+        <li><button data-open="${esc(it.id)}">
+          ${cover(it, 'sm')}
+          <span><span class="index-title">${esc(titleOf(it))}</span>${it.summary ? `<span class="index-sum">${esc(it.summary)}</span>` : ''}</span>
+          <span class="index-year">${esc(it.year)}</span>
+        </button></li>`).join('')}
+      </ol>` : ''}`}`;
+}
+
+function renderStages() {
+  renderStage($('#previewStage'));
+  if (mode === 'view') renderStage($('#viewStage'));
+  if (dlg.open) {
+    const id = detailList[detailIdx]?.id;
+    visible().some(i => i.id === id) ? openDetail(id) : dlg.close();
+  }
+}
+
+/* ---------- Mutations ---------- */
+function commit() { persist(); renderList(); renderEditor(); renderStages(); }
+
+function move(id, to) {
+  const from = state.items.findIndex(i => i.id === id);
+  if (from < 0 || to < 0 || to >= state.items.length || to === from) return;
+  const [it] = state.items.splice(from, 1);
+  state.items.splice(to, 0, it);
+  commit();
+}
+
+let undoData = null, toastTimer;
+function removeItem(id) {
+  const idx = state.items.findIndex(i => i.id === id);
+  if (idx < 0) return;
+  const [it] = state.items.splice(idx, 1);
+  undoData = { it, idx };
+  selectedId = (state.items[idx] || state.items[idx - 1])?.id ?? null;
+  commit();
+  showToast(`Removed “${titleOf(it)}”`);
+}
+function showToast(msg) {
+  $('#toastMsg').textContent = msg;
+  $('#toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $('#toast').classList.remove('show'); undoData = null; }, 6000);
+}
+$('#toastUndo').addEventListener('click', () => {
+  if (!undoData) return;
+  state.items.splice(Math.min(undoData.idx, state.items.length), 0, undoData.it);
+  selectedId = undoData.it.id;
+  undoData = null;
+  $('#toast').classList.remove('show');
+  commit();
+});
+
+/* ---------- Maker events ---------- */
+[['#pName', 'name'], ['#pRole', 'role'], ['#pIntro', 'intro']].forEach(([sel, k]) => {
+  $(sel).addEventListener('input', e => { state.profile[k] = e.target.value; persist(); renderStages(); });
+});
+
+$('#add').addEventListener('click', () => {
+  const it = { id: uid(), title: '', summary: '', description: '', year: String(new Date().getFullYear()), tags: [], link: '', hue: HUES[state.items.length % HUES.length], hidden: false };
+  state.items.push(it);
+  selectedId = it.id;
+  commit();
+  const t = $('#editor [data-f="title"]');
+  t.focus();
+  $('#editor').scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+});
+
+const list = $('#list');
+list.addEventListener('click', e => {
+  const b = e.target.closest('[data-select]');
+  if (!b) return;
+  selectedId = b.dataset.select;
+  renderList(); renderEditor();
+  list.querySelector(`[data-select="${CSS.escape(selectedId)}"]`)?.focus();
+});
+list.addEventListener('keydown', e => {
+  const b = e.target.closest('[data-select]');
+  if (!b || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  e.preventDefault();
+  const id = b.dataset.select;
+  selectedId = id;
+  move(id, state.items.findIndex(i => i.id === id) + (e.key === 'ArrowUp' ? -1 : 1));
+  renderList();
+  list.querySelector(`[data-select="${CSS.escape(id)}"]`)?.focus();
+});
+
+let dragId = null, dropTarget = null;
+const clearDrop = () => list.querySelectorAll('.drop-before, .drop-after').forEach(li => li.classList.remove('drop-before', 'drop-after'));
+list.addEventListener('dragstart', e => {
+  const li = e.target.closest('li');
+  if (!li) return;
+  dragId = li.dataset.id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragId);
+  requestAnimationFrame(() => li.classList.add('dragging'));
+});
+list.addEventListener('dragover', e => {
+  const li = e.target.closest('li');
+  if (!li || !dragId) return;
+  e.preventDefault();
+  clearDrop();
+  if (li.dataset.id === dragId) { dropTarget = null; return; }
+  const r = li.getBoundingClientRect();
+  const before = e.clientY < r.top + r.height / 2;
+  li.classList.add(before ? 'drop-before' : 'drop-after');
+  dropTarget = { id: li.dataset.id, before };
+});
+list.addEventListener('drop', e => {
+  e.preventDefault();
+  if (!dragId || !dropTarget) return;
+  const from = state.items.findIndex(i => i.id === dragId);
+  const [it] = state.items.splice(from, 1);
+  const to = state.items.findIndex(i => i.id === dropTarget.id) + (dropTarget.before ? 0 : 1);
+  state.items.splice(to, 0, it);
+  selectedId = it.id;
+  dropTarget = null;
+  commit();
+});
+list.addEventListener('dragend', () => { dragId = null; dropTarget = null; clearDrop(); list.querySelectorAll('.dragging').forEach(li => li.classList.remove('dragging')); });
+
+const editor = $('#editor');
+editor.addEventListener('input', e => {
+  const f = e.target.dataset.f, it = selected();
+  if (!f || !it) return;
+  const v = e.target.value;
+  if (f === 'tags') it.tags = v.split(',').map(s => s.trim()).filter(Boolean);
+  else if (f === 'shown') it.hidden = !e.target.checked;
+  else if (f === 'hue') it.hue = +v;
+  else it[f] = v;
+  if (f === 'summary') updateSumCount();
+  persist(); renderList(); renderStages();
+});
+editor.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'), it = selected();
+  if (!b || !it) return;
+  const i = state.items.indexOf(it);
+  const act = b.dataset.act;
+  if (act === 'remove') return removeItem(it.id);
+  move(it.id, act === 'top' ? 0 : act === 'up' ? i - 1 : i + 1);
+  editor.querySelector(`[data-act="${act}"]:not(:disabled)`)?.focus();
+});
+
+$('#export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'portfolio.json' });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#importBtn').addEventListener('click', () => $('#importFile').click());
+$('#importFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    state = normalize(JSON.parse(await file.text()));
+    selectedId = state.items[0]?.id ?? null;
+    persist(); renderAll();
+    showToast(`Imported ${state.items.length} projects`);
+  } catch { alert('That file is not a Backstage Folio export.'); }
+});
+$('#reset').addEventListener('click', () => {
+  if (!confirm('Replace your portfolio with the sample projects?')) return;
+  state = seed();
+  selectedId = state.items[0].id;
+  persist(); renderAll();
+});
+
+/* ---------- Detail panel ---------- */
+const dlg = $('#detail');
+let detailList = [], detailIdx = 0;
+
+function formatDesc(text) {
+  const blocks = text.trim().split(/\n\s*\n/).filter(Boolean);
+  if (!blocks.length) return '<p class="hint">No description yet.</p>';
+  return blocks.map(b => {
+    const lines = b.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.every(l => /^[-*] /.test(l))) return `<ul>${lines.map(l => `<li>${esc(l.slice(2))}</li>`).join('')}</ul>`;
+    return `<p>${lines.map(esc).join('<br>')}</p>`;
+  }).join('');
+}
+
+function openDetail(id) {
+  detailList = visible();
+  detailIdx = detailList.findIndex(i => i.id === id);
+  if (detailIdx < 0) return;
+  const it = detailList[detailIdx];
+  $('#dCover').innerHTML = cover(it, 'xl');
+  $('#dMeta').textContent = [detailIdx === 0 ? 'Featured' : '', it.year].filter(Boolean).join(' · ');
+  $('#dTitle').textContent = titleOf(it);
+  $('#dSum').textContent = it.summary;
+  $('#dSum').hidden = !it.summary;
+  $('#dTags').innerHTML = it.tags.map(t => `<span class="pill">${esc(t)}</span>`).join('');
+  $('#dTags').hidden = !it.tags.length;
+  $('#dDesc').innerHTML = formatDesc(it.description);
+  const safe = /^https?:\/\/\S+$/i.test(it.link.trim());
+  $('#dLink').hidden = !safe;
+  if (safe) $('#dLink').href = it.link.trim();
+  const prev = detailList[detailIdx - 1], next = detailList[detailIdx + 1];
+  $('#dPrev').disabled = !prev; $('#dPrev span').textContent = prev ? `← ${titleOf(prev)}` : '← Previous';
+  $('#dNext').disabled = !next; $('#dNext span').textContent = next ? `${titleOf(next)} →` : 'Next →';
+  if (!dlg.open) dlg.showModal();
+}
+
+[$('#previewStage'), $('#viewStage')].forEach(root => root.addEventListener('click', e => {
+  const b = e.target.closest('[data-open]');
+  if (b) { openDetail(b.dataset.open); $('.d-inner').scrollTop = 0; }
+}));
+const step = d => { const it = detailList[detailIdx + d]; if (it) { openDetail(it.id); $('.d-inner').scrollTop = 0; } };
+$('#dPrev').addEventListener('click', () => step(-1));
+$('#dNext').addEventListener('click', () => step(1));
+$('#dClose').addEventListener('click', () => dlg.close());
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+dlg.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea')) return;
+  if (e.key === 'ArrowLeft') step(-1);
+  if (e.key === 'ArrowRight') step(1);
+});
+
+/* ---------- Sync between tabs ---------- */
+window.addEventListener('storage', e => {
+  if (e.key !== KEY) return;
+  const next = load();
+  if (!next) return;
+  state = next;
+  if (!selected()) selectedId = state.items[0]?.id ?? null;
+  renderAll();
+});
+window.addEventListener('hashchange', applyMode);
+
+persist();
+renderProfile(); renderList(); renderEditor();
+applyMode();
+</script>
+</body>
+</html>
