@@ -22,23 +22,51 @@ Each step is a brick that can be added, updated or upgraded on its own, so the w
 
 ## The prototype
 
-Nothing runs yet. The planned prototype is one local server with three pages, which reuses Idea Cooker's code (see [`ARCHITECTURE.md`](ARCHITECTURE.md)):
+A local Node server ([`server.mjs`](server.mjs)) with the Mesh page ([`public/index.html`](public/index.html)). It imports Idea Cooker's modules from `../2026-11-25-idea-cooker/`, so it needs no install of its own. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for how the parts connect.
 
-- **Cooker** ([`SKETCH-cooker.json`](SKETCH-cooker.json)): cook and sketch a new brick with Idea Cooker's chat, design questions and sketch tab. A brick passes its first check layer, "Sketch approved", before it can join the mesh.
-- **Mesh** ([`SKETCH-mesh.json`](SKETCH-mesh.json)): the brick network. A coloured ring around each brick shows its state: red and blurred for sketched, yellow for prototype and green for live. A "!" icon marks a brick that failed in the last run.
-- **Integration** ([`SKETCH-integration.json`](SKETCH-integration.json)): run the whole chain on a test idea and see each brick's output, like Idea Cooker's prototype view.
+What a run does with one prompt:
 
-Runs push to the ideas repo, and the website brick writes to a local folder instead of a public site for now.
+1. **Ideas repo:** Idea Cooker (Claude) writes `<date>-<slug>/README.md` in the ideas repo, and the folder is committed locally. It is never pushed.
+2. **Portfolio + text:** Claude writes a title, summary and description from that README. The entry is added to `portfolio.json` in Backstage Folio's import format.
+3. **Website · local folder:** writes `site/<folder>/index.html` and updates `site/index.html`. Nothing is published.
+
+On the Mesh page:
+
+- **Canvas:** pan by dragging, and zoom with the -/Fit/+ buttons or Ctrl+scroll. A ring shows each brick's state: red and blurred for sketched, yellow for prototype, green for live. A "!" in the top-right corner marks a brick that failed in the last run, and hovering it shows the error.
+- **Inspector:** select a brick to see its checks, what it takes and gives, an on/off switch and its settings (commit on/off, text tone, portfolio category). Only "Sketch approved" is checked so far.
+- **Run log:** one dot per brick, with links to the portfolio entry and web page. Clicking a red dot reruns that brick.
+
+The brick layout is fixed by `mesh.json`, which is created when you first change a setting. PassRotor and Weekly recap are display only. The Cooker and Integration tabs say they are coming next. The server's settings come from Idea Cooker's `config.json`: the repo path, the model and your rule sets.
+
+### Run it
+
+Claude Code needs to be logged in (the same login Idea Cooker uses). From the repo root:
+
+```powershell
+cd 2026-11-26-idea-mesh; npm start
+```
+
+Then open <http://localhost:4330>. Set `PORT` to use another port.
+
+To run the end-to-end test, which uses a throwaway repo in `test/.tmp` and Idea Cooker's fake mode with no Claude calls:
+
+```powershell
+npm test
+```
 
 ## Status
 
-🔴 **Idea.** The three pages are sketched, but nothing is built yet.
+🟡 **Prototype.** One prompt writes, commits, adds a portfolio entry and builds a local page, but the Cooker and Integration pages are not built yet.
 
 ## Next steps
 
 - [x] Map the bricks that already exist (repo, portfolio, PassRotor) and how they connect
-- [ ] Review the three page sketches
-- [ ] Build a first prototype: the local server and the Mesh page
+- [x] Review the three page sketches
+- [x] Build a first prototype: the local server and the Mesh page
+- [ ] Cooker page: cook and sketch a brick with Idea Cooker's chat, then approve its sketch
+- [ ] Integration page: run the full chain on a test idea and compare each brick's output
+- [ ] Add bricks from the page (#14), and upgrade a brick with undo (#18)
 - [ ] Define a simple interface every brick follows, so new ones can be plugged in
 - [ ] Add the Contract, Dry run and Manual OK check layers
+- [ ] Make PassRotor a real brick that supplies the credentials for pushing
 - [ ] Move the website brick from a local folder to a public website

@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IdeaMesh</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f1ec; --surface: #fbfaf7; --raised: #ffffff; --ink: #1f1c18; --muted: #6e675e; --faint: #a59d92;
+    --line: #ddd6cb; --line-strong: #8f877c; --accent: #b4472b; --accent-ink: #ffffff; --accent-soft: #f3e2db;
+    --red: #c2412d; --yellow: #c99a1c; --green: #3f8f5a; --focus: #2d6fd6;
+    --radius: 8px; --ease: 160ms cubic-bezier(.2,.7,.3,1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151412; --surface: #1c1a17; --raised: #24211d; --ink: #ece6dc; --muted: #a59d91; --faint: #6f685f;
+      --line: #34302a; --line-strong: #7b7468; --accent: #e07a5c; --accent-ink: #1a0f0b; --accent-soft: #3a2620;
+      --red: #e0664f; --yellow: #e0b54a; --green: #64b27d; --focus: #79a8ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/20px system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* #1 top bar */
+  .top { height: 56px; display: flex; align-items: center; gap: 32px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .brand { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+  .tabs { display: flex; gap: 8px; height: 100%; }
+  .tab { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 8px; color: var(--muted); background: none; border: 0; cursor: pointer; transition: color var(--ease); }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-current="page"] { color: var(--ink); font-weight: 600; }
+  .tab[aria-current="page"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; background: var(--accent); }
+  .tab small { font-size: 12px; color: var(--faint); font-weight: 400; }
+  .repo { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 24px; display: grid; gap: 24px; }
+
+  /* #2, #3 prompt row */
+  .prompt-row { display: flex; gap: 16px; align-items: stretch; }
+  .prompt { flex: 1; min-height: 56px; max-height: 160px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); resize: none; line-height: 24px; transition: border-color var(--ease); }
+  .prompt::placeholder { color: var(--faint); }
+  .prompt:hover { border-color: var(--line-strong); }
+  .btn { height: 40px; padding: 0 16px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--raised); cursor: pointer; font-weight: 600;
+         transition: background var(--ease), border-color var(--ease), transform var(--ease), opacity var(--ease); }
+  .btn:hover:not(:disabled) { border-color: var(--line-strong); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.06); border-color: var(--accent); }
+  .run { height: auto; min-height: 56px; width: 136px; font-size: 15px; }
+  .run.stopping { background: var(--raised); color: var(--ink); border-color: var(--line-strong); }
+
+  /* #4 canvas + #15 inspector */
+  .work { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 24px; }
+  .canvas { position: relative; height: 512px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; cursor: grab; touch-action: none;
+            background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 16px 16px; }
+  .canvas.panning { cursor: grabbing; }
+  .canvas-title { position: absolute; left: 16px; top: 16px; color: var(--muted); font-size: 13px; pointer-events: none; }
+  .layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  .wire { stroke: var(--line-strong); stroke-width: 1.5; fill: none; transition: stroke var(--ease); }
+  .wire.dashed { stroke-dasharray: 5 5; }
+  .wire.lit { stroke: var(--accent); stroke-width: 2; }
+  .arrowhead { fill: var(--line-strong); }
+
+  /* #22, #23 zoom, grouped */
+  .zoom { position: absolute; right: 16px; top: 16px; display: flex; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); overflow: hidden; }
+  .zoom button { width: 40px; height: 32px; border: 0; background: none; cursor: pointer; color: var(--ink); transition: background var(--ease); }
+  .zoom button + button { border-left: 1px solid var(--line); }
+  .zoom button:hover { background: var(--accent-soft); }
+  .zoom .fit { width: 48px; font-size: 13px; }
+
+  .node-prompt { position: absolute; width: 64px; height: 64px; border-radius: 50%; border: 1.5px solid var(--line-strong); background: var(--raised); display: grid; place-items: center; font-size: 13px; cursor: pointer; transition: border-color var(--ease); }
+  .node-prompt:hover { border-color: var(--accent); }
+
+  .brick { position: absolute; width: 160px; height: 80px; padding: 16px; border-radius: var(--radius); border: 2px solid var(--ring); background: var(--raised); text-align: left; cursor: pointer;
+           display: grid; align-content: center; gap: 4px; transition: box-shadow var(--ease), filter var(--ease), opacity var(--ease); }
+  .brick:hover { box-shadow: 0 2px 8px rgb(0 0 0 / .08); }
+  .brick[aria-pressed="true"] { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ring) 28%, transparent); }
+  .brick .name { font-weight: 600; font-size: 14px; line-height: 20px; }
+  .brick .meta { font-size: 12px; line-height: 16px; color: var(--muted); }
+  .brick.ring-red { --ring: var(--red); filter: blur(1.5px); opacity: .7; }
+  .brick.ring-red:hover, .brick.ring-red:focus-visible, .brick.ring-red[aria-pressed="true"] { filter: none; opacity: 1; }
+  .brick.ring-yellow { --ring: var(--yellow); }
+  .brick.ring-green { --ring: var(--green); }
+  .brick.off { opacity: .55; }
+  .brick.running { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); } }
+
+  /* state icon, top-right of a brick */
+  .flagwrap { position: absolute; }
+  .flag { position: absolute; top: -8px; left: -16px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--surface); background: var(--red); color: #fff; font-weight: 700; font-size: 13px; line-height: 20px; padding: 0; cursor: help; }
+  .flag + .tip { position: absolute; z-index: 3; top: -8px; left: 16px; width: 240px; padding: 8px 16px; border-radius: var(--radius); background: var(--ink); color: var(--bg); font-size: 13px; line-height: 18px;
+                 opacity: 0; pointer-events: none; transform: translateY(2px); transition: opacity var(--ease), transform var(--ease); }
+  .flag:hover + .tip, .flag:focus-visible + .tip { opacity: 1; transform: none; }
+
+  .canvas-foot { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; gap: 16px; align-items: center; }
+  .legend { display: flex; gap: 16px; color: var(--muted); font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid; }
+
+  .inspector { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 24px; display: grid; align-content: start; gap: 24px; min-height: 512px; }
+  .empty { color: var(--muted); }
+  .head { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+  .head h2 { margin: 0; font-size: 18px; line-height: 24px; }
+  .head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .switch { position: relative; width: 40px; height: 24px; flex: none; border-radius: 12px; border: 0; background: var(--line); cursor: pointer; transition: background var(--ease); }
+  .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--raised); transition: transform var(--ease); }
+  .switch[aria-checked="true"] { background: var(--green); }
+  .switch[aria-checked="true"]::after { transform: translateX(16px); }
+  .switch:disabled { opacity: .4; cursor: not-allowed; }
+  .group h3 { margin: 0 0 8px; font-size: 13px; line-height: 16px; color: var(--muted); font-weight: 600; }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .checks li { display: flex; justify-content: space-between; gap: 16px; }
+  .checks .pass { color: var(--green); } .checks .fail { color: var(--red); } .checks .later { color: var(--faint); }
+  dl { margin: 0; display: grid; grid-template-columns: 64px 1fr; gap: 8px 16px; }
+  dt { color: var(--muted); } dd { margin: 0; }
+  .field { display: grid; grid-template-columns: 64px 1fr; gap: 16px; align-items: center; }
+  .field + .field { margin-top: 8px; }
+  .field label { color: var(--muted); }
+  select { height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); cursor: pointer; transition: border-color var(--ease); }
+  select:hover:not(:disabled) { border-color: var(--line-strong); }
+  select:disabled { opacity: .5; cursor: not-allowed; }
+  .note { margin: 0; color: var(--muted); font-size: 13px; line-height: 20px; }
+
+  /* #19 run log */
+  .log { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .log h2 { margin: 0; padding: 16px 24px 8px; font-size: 15px; line-height: 24px; }
+  .log ol { list-style: none; margin: 0; padding: 0 0 8px; max-height: 240px; overflow: auto; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 24px; align-items: center; padding: 8px 24px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .what { min-width: 0; }
+  .row .what b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .what span { color: var(--muted); font-size: 12px; }
+  .dots { display: flex; gap: 8px; }
+  .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line-strong); background: none; padding: 0; }
+  .dot.ok { background: var(--green); border-color: var(--green); }
+  .dot.failed { background: var(--red); border-color: var(--red); cursor: pointer; transition: transform var(--ease); }
+  .dot.failed:hover { transform: scale(1.2); }
+  .dot.running { border-color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  .dot.waiting { border-style: dotted; }
+  .links { display: flex; gap: 16px; font-size: 13px; }
+  .links a { color: var(--accent); text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  .row .err { grid-column: 1 / -1; margin: 0; color: var(--red); font-size: 13px; }
+  .log .empty { padding: 0 24px 16px; margin: 0; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 16px; border-radius: var(--radius); background: var(--ink); color: var(--bg); font-size: 13px; }
+  .soon { max-width: 480px; margin: 80px auto; text-align: center; }
+  .soon h1 { font-size: 24px; line-height: 32px; margin: 0 0 8px; }
+  .soon p { color: var(--muted); margin: 0 0 24px; }
+
+  @media (max-width: 900px) {
+    .work { grid-template-columns: 1fr; }
+    .inspector { min-height: 0; }
+  }
+  @media (max-width: 600px) {
+    .top { gap: 16px; padding: 0 16px; }
+    .repo, .tab small { display: none; }
+    .page { padding: 16px; gap: 16px; }
+    .prompt-row { flex-direction: column; }
+    .run { width: 100%; }
+    .canvas { height: 400px; }
+    .legend { display: none; }
+    .row { grid-template-columns: 1fr auto; }
+    .links { grid-column: 1 / -1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; animation: none !important; }
+    .brick.running { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent); }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">IdeaMesh</div>
+  <nav class="tabs" aria-label="Pages">
+    <button class="tab" data-page="cooker">Cooker <small>next</small></button>
+    <button class="tab" data-page="mesh" aria-current="page">Mesh</button>
+    <button class="tab" data-page="integration">Integration <small>next</small></button>
+  </nav>
+  <span class="repo" id="repo"></span>
+</header>
+
+<main class="page" id="meshPage">
+  <form class="prompt-row" id="runForm">
+    <label for="prompt" hidden>Today's idea</label>
+    <textarea class="prompt" id="prompt" rows="1" placeholder="Describe today's idea…"></textarea>
+    <button class="btn primary run" id="run" disabled>Run mesh</button>
+  </form>
+
+  <div class="work">
+    <section class="canvas" id="canvas" aria-label="Brick network">
+      <div class="canvas-title">Brick network</div>
+      <div class="layer" id="layer">
+        <svg class="wires" id="wires" width="1" height="1" aria-hidden="true">
+          <defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+        </svg>
+      </div>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button id="zoomOut" aria-label="Zoom out">−</button>
+        <button id="zoomFit" class="fit">Fit</button>
+        <button id="zoomIn" aria-label="Zoom in">+</button>
+      </div>
+      <div class="canvas-foot">
+        <button class="btn" id="addBrick" disabled title="Adding bricks comes with the Cooker page">Add brick</button>
+        <div class="legend">
+          <span><i style="border-color:var(--red)"></i>Sketched</span>
+          <span><i style="border-color:var(--yellow)"></i>Prototype</span>
+          <span><i style="border-color:var(--green)"></i>Live</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector" id="inspector" aria-live="polite"></aside>
+  </div>
+
+  <section class="log" aria-labelledby="logTitle">
+    <h2 id="logTitle">Run log</h2>
+    <ol id="runs"></ol>
+    <p class="empty" id="noRuns">No runs yet. Describe an idea above and press Run mesh.</p>
+  </section>
+</main>
+
+<main class="soon" id="soonPage" hidden>
+  <h1 id="soonTitle"></h1>
+  <p id="soonText"></p>
+  <button class="btn" data-page="mesh">Back to the mesh</button>
+</main>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const RING = { red: "Sketched", yellow: "Prototype", green: "Live" };
+const BW = 160, BH = 80;
+
+let state = { mesh: { bricks: [], connections: [] }, runs: [], options: {}, busy: false };
+let selected = null;
+let view = { x: 0, y: 0, k: 1 };
+let stopping = false;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "content-type": "application/json" } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => (t.hidden = true), 3200);
+}
+
+const ago = (iso) => {
+  if (!iso) return "";
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  if (m < 1440) return `${Math.round(m / 60)} h ago`;
+  return new Date(iso).toLocaleDateString();
+};
+
+/* ---------- Pages (Cooker and Integration come next) ---------- */
+const SOON = {
+  cooker: ["Cooker comes next", "Cook and sketch a new brick with Idea Cooker's chat, design questions and sketch tab. A brick joins the mesh once its sketch is approved."],
+  integration: ["Integration comes next", "Run the whole chain on a test idea and look at what each brick produced, side by side."],
+};
+function showPage(page) {
+  document.querySelectorAll(".tab").forEach((t) => t.dataset.page === page ? t.setAttribute("aria-current", "page") : t.removeAttribute("aria-current"));
+  $("#meshPage").hidden = page !== "mesh";
+  $("#soonPage").hidden = page === "mesh";
+  if (SOON[page]) [$("#soonTitle").textContent, $("#soonText").textContent] = SOON[page];
+  if (location.hash.slice(1) !== page) history.pushState(null, "", page === "mesh" ? location.pathname : `#${page}`);
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-page]");
+  if (t) showPage(t.dataset.page);
+});
+addEventListener("popstate", () => showPage(location.hash.slice(1) || "mesh"));
+
+/* ---------- Canvas ---------- */
+const latestRun = () => state.runs[0] || null;
+const stepOf = (run, id) => run?.steps.find((s) => s.brick === id) || null;
+const brickById = (id) => state.mesh.bricks.find((b) => b.id === id);
+
+function promptPos() {
+  const first = state.mesh.connections.find((c) => c.from === "prompt");
+  const b = first && brickById(first.to);
+  return b ? { x: b.x - 112, y: b.y + 8 } : { x: 24, y: 200 };
+}
+
+function box(id) {
+  if (id === "prompt") { const p = promptPos(); return { x: p.x, y: p.y, w: 64, h: 64 }; }
+  const b = brickById(id);
+  return b && { x: b.x, y: b.y, w: BW, h: BH };
+}
+
+function wirePath(a, b) {
+  const ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  if (Math.abs(bc.y - ac.y) > Math.abs(bc.x - ac.x)) {
+    const down = bc.y > ac.y;
+    return [ac.x, down ? a.y + a.h : a.y, bc.x, down ? b.y - 2 : b.y + b.h + 2];
+  }
+  return [a.x + a.w, ac.y, b.x - 2, bc.y];
+}
+
+function renderCanvas() {
+  const layer = $("#layer"), svg = $("#wires");
+  layer.querySelectorAll(".brick, .node-prompt, .flagwrap").forEach((n) => n.remove());
+  svg.querySelectorAll("path.wire").forEach((n) => n.remove());
+  const run = latestRun();
+  const last = state.runs.find((r) => r.state !== "running") || null;
+
+  for (const c of state.mesh.connections) {
+    const a = box(c.from), b = box(c.to);
+    if (!a || !b) continue;
+    const [x1, y1, x2, y2] = wirePath(a, b);
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const s = run && stepOf(run, c.to);
+    const lit = run?.state === "running" && s && (s.state === "running" || s.state === "ok");
+    p.setAttribute("class", `wire${c.dashed ? " dashed" : ""}${lit ? " lit" : ""}`);
+    p.setAttribute("d", y1 === y2 ? `M${x1} ${y1}H${x2}` : x1 === x2 ? `M${x1} ${y1}V${y2}` : `M${x1} ${y1}C${(x1 + x2) / 2} ${y1} ${(x1 + x2) / 2} ${y2} ${x2} ${y2}`);
+    p.setAttribute("marker-end", "url(#head)");
+    svg.appendChild(p);
+  }
+
+  const pp = promptPos();
+  const pn = Object.assign(document.createElement("button"), { className: "node-prompt", textContent: "Prompt", title: "Go to the idea field" });
+  Object.assign(pn.style, { left: pp.x + "px", top: pp.y + "px" });
+  pn.addEventListener("click", () => $("#prompt").focus());
+  layer.appendChild(pn);
+
+  for (const b of state.mesh.bricks) {
+    const s = run && stepOf(run, b.id);
+    const el = document.createElement("button");
+    el.className = `brick ring-${b.ring}${b.enabled ? "" : " off"}${run?.state === "running" && s?.state === "running" ? " running" : ""}`;
+    el.dataset.id = b.id;
+    el.setAttribute("aria-pressed", String(selected === b.id));
+    el.setAttribute("aria-label", `${b.label}, ${RING[b.ring]}${b.enabled ? "" : ", off"}`);
+    Object.assign(el.style, { left: b.x + "px", top: b.y + "px" });
+    el.innerHTML = `<span class="name">${esc(b.label)}</span><span class="meta">${esc(brickMeta(b, run))}</span>`;
+    el.addEventListener("click", () => select(b.id));
+    layer.appendChild(el);
+
+    const ls = last && stepOf(last, b.id);
+    if (ls?.state === "failed") {
+      const wrap = document.createElement("div");
+      wrap.className = "flagwrap";
+      Object.assign(wrap.style, { left: b.x + BW + "px", top: b.y + "px" });
+      const tipId = `tip-${b.id}`;
+      wrap.innerHTML = `<button class="flag" aria-describedby="${tipId}" aria-label="Failed in the last run">!</button><div class="tip" role="tooltip" id="${tipId}">Failed in the last run, ${esc(ago(ls.endedAt))}: ${esc(ls.error)}</div>`;
+      layer.appendChild(wrap);
+    }
+  }
+  applyView();
+}
+
+function brickMeta(b, run) {
+  const s = run && stepOf(run, b.id);
+  if (run?.state === "running" && s) {
+    if (s.state === "running") return "Running…";
+    if (s.state === "waiting") return "Waiting";
+  }
+  if (!b.enabled) return b.runs ? "Off" : `${RING[b.ring]} · not run yet`;
+  if (b.id === "repo") {
+    const done = state.runs.map((r) => stepOf(r, "repo")).find((x) => x?.state === "ok");
+    return done ? `Last commit ${ago(done.endedAt)}` : "No commits yet";
+  }
+  return RING[b.ring];
+}
+
+function applyView() {
+  $("#layer").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
+}
+
+function bounds() {
+  const items = [box("prompt"), ...state.mesh.bricks.map((b) => box(b.id))];
+  const x0 = Math.min(...items.map((i) => i.x)), y0 = Math.min(...items.map((i) => i.y));
+  const x1 = Math.max(...items.map((i) => i.x + i.w)), y1 = Math.max(...items.map((i) => i.y + i.h));
+  return { x0, y0, x1, y1 };
+}
+
+function fit() {
+  const c = $("#canvas").getBoundingClientRect();
+  const b = bounds();
+  const padTop = 64, padBottom = 72, pad = 32;
+  const k = Math.max(0.4, Math.min(1.25, (c.width - pad * 2) / (b.x1 - b.x0 + 32), (c.height - padTop - padBottom) / (b.y1 - b.y0 + 16)));
+  view.k = k;
+  view.x = (c.width - (b.x1 - b.x0) * k) / 2 - b.x0 * k;
+  view.y = padTop + (c.height - padTop - padBottom - (b.y1 - b.y0) * k) / 2 - b.y0 * k;
+  applyView();
+}
+
+function zoomBy(f, cx, cy) {
+  const c = $("#canvas").getBoundingClientRect();
+  cx ??= c.width / 2; cy ??= c.height / 2;
+  const k = Math.max(0.4, Math.min(2, view.k * f));
+  view.x = cx - ((cx - view.x) * k) / view.k;
+  view.y = cy - ((cy - view.y) * k) / view.k;
+  view.k = k;
+  applyView();
+}
+$("#zoomIn").addEventListener("click", () => zoomBy(1.2));
+$("#zoomOut").addEventListener("click", () => zoomBy(1 / 1.2));
+$("#zoomFit").addEventListener("click", fit);
+$("#canvas").addEventListener("wheel", (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const r = $("#canvas").getBoundingClientRect();
+  zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+
+// Pan by dragging the background.
+let drag = null;
+$("#canvas").addEventListener("pointerdown", (e) => {
+  if (e.target.closest("button")) return;
+  drag = { x: e.clientX - view.x, y: e.clientY - view.y };
+  $("#canvas").classList.add("panning");
+  $("#canvas").setPointerCapture(e.pointerId);
+});
+$("#canvas").addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  view.x = e.clientX - drag.x;
+  view.y = e.clientY - drag.y;
+  applyView();
+});
+const endDrag = () => { drag = null; $("#canvas").classList.remove("panning"); };
+$("#canvas").addEventListener("pointerup", endDrag);
+$("#canvas").addEventListener("pointercancel", endDrag);
+
+/* ---------- Inspector ---------- */
+function select(id) {
+  selected = selected === id ? null : id;
+  renderCanvas();
+  renderInspector();
+}
+
+const SETTING_LABELS = { commit: "Commit", tone: "Tone", kind: "Category" };
+const VALUE_LABELS = { true: "Commit locally", false: "Only write files", personal: "Personal", plain: "Plain", technical: "Technical", hobby: "#Hobby project", university: "#University project", "": "None" };
+
+function renderInspector() {
+  const el = $("#inspector");
+  const b = selected && brickById(selected);
+  if (!b) {
+    el.innerHTML = `<p class="empty">Select a brick to see its checks and settings.</p>`;
+    return;
+  }
+  const opts = state.options[b.id] || {};
+  const locked = state.busy;
+  const settings = Object.keys(opts).map((k) => `
+    <div class="field"><label for="set-${k}">${SETTING_LABELS[k] || k}</label>
+      <select id="set-${k}" data-key="${k}" ${locked ? "disabled" : ""}>
+        ${opts[k].map((v) => `<option value="${esc(JSON.stringify(v))}" ${b.settings[k] === v ? "selected" : ""}>${esc(VALUE_LABELS[String(v)] ?? v)}</option>`).join("")}
+      </select></div>`).join("");
+  const passed = !!b.checks?.sketchApproved;
+  el.innerHTML = `
+    <div class="head">
+      <div><h2>${esc(b.label)} · v${b.version}</h2><p>${RING[b.ring]}${b.skip ? ` · skipped in runs: ${esc(b.skip.toLowerCase())}` : " · runs next time"}</p></div>
+      <button class="switch" role="switch" aria-checked="${b.enabled}" aria-label="Run ${esc(b.label)}" ${!b.runs || locked ? "disabled" : ""}
+        title="${b.runs ? (b.enabled ? "Switch off to skip it in runs" : "Switch on") : "This brick can't run yet"}"></button>
+    </div>
+    <div class="group"><h3>Checks</h3>
+      <ul class="checks">
+        <li><span>Sketch approved</span><span class="${passed ? "pass" : "fail"}">${passed ? "Passed" : "Not yet"}</span></li>
+        <li><span>Contract</span><span class="later">Later</span></li>
+        <li><span>Dry run</span><span class="later">Later</span></li>
+        <li><span>Manual OK</span><span class="later">Later</span></li>
+      </ul></div>
+    <div class="group"><h3>Flow</h3><dl><dt>Takes</dt><dd>${esc(b.takes)}</dd><dt>Gives</dt><dd>${esc(b.gives)}</dd></dl></div>
+    ${settings ? `<div class="group"><h3>Settings</h3>${settings}</div>` : ""}
+    <p class="note">${esc(b.note || "")}</p>`;
+  el.querySelector(".switch").addEventListener("click", () => patch(b.id, { enabled: !b.enabled }));
+  el.querySelectorAll("select").forEach((s) => s.addEventListener("change", () => patch(b.id, { settings: { [s.dataset.key]: JSON.parse(s.value) } })));
+}
+
+async function patch(id, body) {
+  try {
+    await api(`/api/bricks/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    await load();
+  } catch (e) {
+    toast(e.message);
+    renderInspector();
+  }
+}
+
+/* ---------- Run log ---------- */
+const STEP_WORD = { ok: "done", failed: "failed", skipped: "skipped", running: "running", waiting: "waiting" };
+
+function renderRuns() {
+  const list = $("#runs");
+  $("#noRuns").hidden = state.runs.length > 0;
+  list.innerHTML = state.runs.map((r) => {
+    const failed = r.steps.filter((s) => s.state === "failed");
+    const links = r.steps.filter((s) => s.link).map((s) => `<a href="${esc(s.link)}" target="_blank" rel="noopener">${s.brick === "portfolio" ? "Portfolio entry" : "Web page"}</a>`);
+    const commit = stepOf(r, "repo");
+    const sha = commit?.state === "ok" && /Committed (\w+)/.exec(commit.detail || "")?.[1];
+    return `<li class="row">
+      <div class="what"><b>${esc(r.folder || r.prompt)}</b><span>${r.state === "running" ? "Running…" : ago(r.startedAt)}${sha ? ` · commit ${esc(sha)}` : ""}${r.state === "stopped" ? " · stopped" : ""}</span></div>
+      <div class="dots">${r.steps.map((s) => s.state === "failed"
+        ? `<button class="dot failed" data-run="${r.id}" data-brick="${s.brick}" title="${esc(s.label)} failed. Click to rerun it." aria-label="Rerun ${esc(s.label)}" ${state.busy ? "disabled" : ""}></button>`
+        : `<span class="dot ${s.state}" title="${esc(s.label)}: ${STEP_WORD[s.state]}${s.detail ? ` (${esc(s.detail)})` : ""}" role="img" aria-label="${esc(s.label)} ${STEP_WORD[s.state]}"></span>`).join("")}</div>
+      <div class="links">${links.join("")}</div>
+      ${failed.length ? `<p class="err">${failed.map((s) => `${esc(s.label)}: ${esc(s.error)}`).join("<br>")}</p>` : ""}
+    </li>`;
+  }).join("");
+  list.querySelectorAll(".dot.failed").forEach((d) => d.addEventListener("click", async () => {
+    try {
+      await api(`/api/runs/${d.dataset.run}/rerun`, { method: "POST", body: JSON.stringify({ brick: d.dataset.brick }) });
+      state.busy = true;
+      renderAll();
+    } catch (e) { toast(e.message); }
+  }));
+}
+
+/* ---------- Run controls ---------- */
+function renderControls() {
+  const btn = $("#run");
+  if (state.busy) {
+    btn.textContent = stopping ? "Stopping…" : "Stop run";
+    btn.classList.add("stopping");
+    btn.disabled = stopping;
+  } else {
+    btn.textContent = "Run mesh";
+    btn.classList.remove("stopping");
+    btn.disabled = !$("#prompt").value.trim();
+  }
+}
+
+$("#prompt").addEventListener("input", (e) => {
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(160, e.target.scrollHeight + 2) + "px";
+  renderControls();
+});
+$("#prompt").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#runForm").requestSubmit(); }
+});
+$("#runForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    if (state.busy) {
+      stopping = true;
+      renderControls();
+      await api("/api/stop", { method: "POST" });
+      return;
+    }
+    const prompt = $("#prompt").value.trim();
+    if (!prompt) return;
+    const run = await api("/api/run", { method: "POST", body: JSON.stringify({ prompt }) });
+    $("#prompt").value = "";
+    $("#prompt").style.height = "";
+    upsertRun(run);
+  } catch (err) {
+    stopping = false;
+    toast(err.message);
+    renderControls();
+  }
+});
+
+/* ---------- Data ---------- */
+function upsertRun(run) {
+  const i = state.runs.findIndex((r) => r.id === run.id);
+  if (i >= 0) state.runs[i] = run; else state.runs.unshift(run);
+  state.busy = run.state === "running";
+  if (!state.busy) stopping = false;
+  renderAll();
+}
+
+function renderAll() {
+  renderCanvas();
+  renderInspector();
+  renderRuns();
+  renderControls();
+}
+
+let fitted = false;
+async function load() {
+  try {
+    state = await api("/api/state");
+  } catch (e) {
+    toast(`Can't reach the IdeaMesh server: ${e.message}`);
+    return;
+  }
+  $("#repo").textContent = state.repo + (state.fake ? " · test mode" : "");
+  renderAll();
+  if (!fitted) { fit(); fitted = true; }
+}
+
+const events = new EventSource("/api/events");
+events.onmessage = (e) => {
+  const run = JSON.parse(e.data);
+  upsertRun(run);
+  if (run.state !== "running") load();
+};
+
+addEventListener("resize", () => { clearTimeout(fit.t); fit.t = setTimeout(fit, 150); });
+showPage(location.hash.slice(1) || "mesh");
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "idea-mesh",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local server that sends one idea prompt through a network of bricks: ideas repo, portfolio, local website.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test/run.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
