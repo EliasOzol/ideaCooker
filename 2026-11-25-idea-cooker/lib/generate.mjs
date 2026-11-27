@@ -25,6 +25,18 @@ const RULES_SHELL = `You may run shell commands inside the project folder to che
 const CHECKS_NO_SHELL = `You can't run commands, so you can't run the tests or the app. Read the code carefully instead, and say what the user should run to check your change.`;
 const CHECKS_SHELL = `Check your change by running it: run the project's tests (install dependencies first if needed, e.g. npm install), and if it has a local server or test site, start it in the background, request its pages, then stop it. Tell the user what you ran and what passed or failed, and what they still need to try by hand (for example a browser extension in their browser).`;
 
+/** When and how Claude draws the architecture, and how it treats a diagram the user edited. */
+const archRule = (archPath) => `If the prototype has several parts (more than one file with logic, a server, a browser extension, external APIs, or data moving between components), write \`${archPath}\`: a short note plus one to three Mermaid diagrams in \`\`\`mermaid blocks (a flowchart or component diagram of the parts, and a class or sequence diagram where it helps). Keep labels short and the diagrams valid Mermaid. If \`${archPath}\` already exists, the user may have edited it by hand: treat it as the agreed design and build to match it; if the request needs a different design, update the diagram and say what changed. A single simple page doesn't need one unless the user asks.`;
+
+/** The user's answers to the pre-build questions, and the planned diagram they approved (and maybe edited). */
+function designBlock(design, archPath) {
+  if (!design || (!design.answers?.length && !design.plan)) return "";
+  let out = "\n\nDesign decisions the user made before you started. Follow them; they override your own defaults:\n";
+  if (design.answers?.length) out += design.answers.map((a) => `- ${a.question}\n  Answer: ${a.answer}`).join("\n") + "\n";
+  if (design.plan) out += `\nThe user approved this planned architecture (they may have edited it). Write it to \`${archPath}\` as a \`\`\`mermaid block with a short explanation (fix only invalid syntax), and build to match it:\n\`\`\`mermaid\n${design.plan.trim()}\n\`\`\`\n`;
+  return out;
+}
+
 /** What a demo for the preview panel is; used when linking a repo and when keeping the demo up to date. */
 const demoSpec = (demoPath, projectLabel) => `\`${demoPath}\` is the live demo that the user's preview panel shows for ${projectLabel}: one self-contained HTML page (inline CSS and JS, no build step, no network, no external files) that lets them try the project's core flow right away with dummy data. Reuse the project's real logic where you can by copying the relevant functions in, so the demo behaves like the real thing; fake only what can't run in a plain web page (browser-extension APIs, servers, logins, file access), and keep fakes small and clearly in-memory. Put a one-line note at the top saying it's a demo with dummy data. It is not part of the project's repository.`;
 
@@ -97,7 +109,7 @@ export function rulesBlock(rules = []) {
 
 async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules = [], allowCommands = false, log, emit }) {
   const rs = rulesSections(rules);
-  const prompt = (rs.head + basePrompt + rs.tail)
+  const prompt = (rs.head + basePrompt + (scope.readOnly ? "" : rs.tail))
     .replaceAll(RULES, allowCommands ? RULES_SHELL : RULES_NO_SHELL)
     .replaceAll(CHECKS, allowCommands ? CHECKS_SHELL : CHECKS_NO_SHELL);
   if (rules.length) log(`Rules: ${rules.map((r) => r.title || "untitled").join(", ")}`);
@@ -121,6 +133,7 @@ async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules
       return inside(p) ? { behavior: "allow", updatedInput: input } : { behavior: "deny", message: "Only read files inside the repository." };
     }
     if (toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit" || toolName === "NotebookEdit") {
+      if (scope.readOnly) return { behavior: "deny", message: "Don't write anything yet; this step only asks questions." };
       const target = String(input.file_path || input.notebook_path || "");
       const inClone = clone ? within(clone, target) : null;
       if (inClone !== null && clone) {
@@ -221,12 +234,12 @@ async function runClaude({ root, prompt: basePrompt, scope, resume, model, rules
 }
 
 /** New idea: Claude creates `<today>-<slug>/` with README + prototype. */
-export async function cookIdea({ repoPath, idea, model, rules = [], allowCommands = false, log, emit = () => {}, saveOnly = false }) {
+export async function cookIdea({ repoPath, idea, design = null, model, rules = [], allowCommands = false, log, emit = () => {}, saveOnly = false }) {
   const root = path.resolve(repoPath);
   const date = today();
   const existing = await topFolders(root);
   const existingLower = new Set(existing.map((n) => n.toLowerCase()));
-  if (FAKE()) return fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, rules });
+  if (FAKE()) return fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, rules, design });
   if (saveOnly) {
     const prompt = `You are helping with a "daily idea" practice. The user wants to write down an idea now and maybe build it later. Their daily-ideas git repository is your current working directory.
 
@@ -268,7 +281,8 @@ Do this:
 4. ${STATUS_RULE} A freshly built prototype is normally 🟡.
 5. Build a small prototype that actually works. Prefer a single self-contained \`index.html\` (inline CSS and JS, no build step, no external network calls unless the idea needs them) that opens by double-clicking. If the idea really needs something else (a Python script, an Arduino sketch, a CLI), keep it to a few files with no install step where possible, and explain how to run it in the README.
 6. Keep it small: the prototype should demonstrate the core mechanic of the idea well, not be a full product. Make it look good.
-7. ${RULES}
+7. ${archRule(`${date}-<slug>/ARCHITECTURE.md`)}
+8. ${RULES}${designBlock(design, `${date}-<slug>/ARCHITECTURE.md`)}
 
 The user will see your final reply in a chat next to the prototype, and may ask for changes afterwards. When you're done, reply in 2-3 short sentences: what you built and what to try first. Don't repeat the README.
 
@@ -286,9 +300,9 @@ ${await example()}
 }
 
 /** Follow-up: Claude changes an existing idea, only inside its folder. */
-export async function reviseIdea({ repoPath, folder, message, sessionId, model, rules = [], allowCommands = false, log, emit = () => {}, clone = null, cloneLabel = "", demo = null }) {
+export async function reviseIdea({ repoPath, folder, message, design = null, sessionId, model, rules = [], allowCommands = false, log, emit = () => {}, clone = null, cloneLabel = "", demo = null }) {
   const root = path.resolve(repoPath);
-  if (FAKE()) return fakeRevise({ root, folder, message, log, emit, clone, cloneLabel, demo });
+  if (FAKE()) return fakeRevise({ root, folder, message, log, emit, clone, cloneLabel, demo, design });
   if (clone) {
     const ideaDir = path.join(root, folder);
     const demoPath = path.join(ideaDir, "demo.html");
@@ -311,9 +325,10 @@ Rules:
 - ${CHECKS}
 - If the change affects what the idea notes say (what works, status, next steps), update \`${ideaDir}${path.sep}README.md\` too. Keep its format. ${STATUS_RULE}
 ${demoRule}
+- ${archRule(path.join(ideaDir, "ARCHITECTURE.md"))} (It describes the project, and lives in the ideas repository, not in the project.)
 - Don't change anything else in the ideas repository.
 - If the request is only a question, answer it and don't change files.
-- ${RULES} The app commits your changes to ${cloneLabel} and pushes them.
+- ${RULES} The app commits your changes to ${cloneLabel} and pushes them.${designBlock(design, path.join(ideaDir, "ARCHITECTURE.md"))}
 
 Reply in 1-4 short sentences: what you changed (or the answer), and how to check it.`;
     return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, cloneWritable: true }, resume: sessionId, model, rules, allowCommands, log, emit });
@@ -328,11 +343,77 @@ ${message}
 Make the change. Rules:
 - Only create or edit files inside \`${folder}/\`. Other folders are other ideas; don't touch them.
 - Keep \`${folder}/README.md\` accurate. When the change affects them, update "The prototype", "Run it", "Status" and "Next steps" (tick off done items). Keep its format. ${STATUS_RULE}
+- ${archRule(`${folder}/ARCHITECTURE.md`)}
 - If the request is only a question, answer it and don't change files.
-- ${RULES}
+- ${RULES}${designBlock(design, `${folder}/ARCHITECTURE.md`)}
 
 Reply in 1-3 short sentences: what you changed (or the answer). The user sees the updated prototype next to your reply.`;
   return runClaude({ root, prompt, scope: { type: "folder", folder }, resume: sessionId, model, rules, allowCommands, log, emit });
+}
+
+/**
+ * Before building: Claude only reads, then returns design questions with options and, for bigger builds,
+ * a planned Mermaid diagram. Nothing is written. Returns { questions: [{ question, options, multiple }], diagram, note }.
+ */
+export async function askQuestions({ repoPath, folder = null, message, clone = null, cloneLabel = "", model, rules = [], log }) {
+  const root = path.resolve(repoPath);
+  if (FAKE()) {
+    log("[fake mode] questions");
+    return {
+      questions: [
+        { question: "Who is it mainly for?", options: ["Just me", "Friends", "Anyone online"], multiple: false },
+        { question: "Which parts should the first version have?", options: ["Core flow only", "Core flow + settings", "Everything"], multiple: true },
+      ],
+      diagram: "flowchart LR\n  User --> UI --> Store[(localStorage)]",
+      note: "[fake] Two quick questions.",
+    };
+  }
+  const where = clone
+    ? `the user's linked project ${cloneLabel} (its code is in your working directory; the idea notes, and ARCHITECTURE.md if it exists, are in \`${path.join(root, folder)}\`)`
+    : folder
+      ? `the idea in \`${folder}/\` in the user's daily-ideas repository (your working directory)`
+      : `a brand-new idea; the user's daily-ideas repository is your working directory, but there is nothing to read for it yet`;
+  const prompt = `The user is about to ask you to ${folder ? "change" : "build a first prototype of"} ${where}. They want to settle the design before anything is built, so first ask them the questions whose answers would change what you build. They prefer too many questions over a result that isn't what they meant.
+
+Their request:
+<request>
+${message}
+</request>
+
+${folder ? "Read the relevant files first (README, the prototype, ARCHITECTURE.md if there is one) so you only ask what isn't already decided. " : ""}Don't write or change any files in this step.
+
+Then reply with ONLY a JSON object in a \`\`\`json code block, shaped like this:
+{"questions": [{"question": "…", "options": ["…", "…"], "multiple": false}], "diagram": "", "note": "…"}
+
+- questions: ${folder ? "0 to 6. Use 0 only if the request is small and completely clear (for example a typo or a colour)." : "3 to 7."} Ask about what matters for this request: who it's for, the look and feel, the core interactions, what the first version includes and leaves out, data and persistence, platform. One decision per question, short and concrete.
+- options: 2 to 4 concrete answers, your recommendation first. The user can always write their own answer, so don't add an "Other" option. Set "multiple": true only when picking several makes sense.
+- diagram: for bigger builds (several parts: more than one file with logic, a server, a browser extension, external APIs, data moving between components), the planned architecture as plain Mermaid source without code fences (a flowchart, or a class diagram), short labels, valid syntax. The user can edit it before you build. Otherwise "".
+- note: one short sentence to show above the questions.`;
+  const r = await runClaude({ root, prompt, scope: { type: "folder", folder: folder || "", clone, cloneLabel, readOnly: true }, model, rules, allowCommands: false, log, emit: () => {} });
+  return parseQuestions(r.reply);
+}
+
+/** Pull the JSON out of Claude's reply and keep only well-formed questions. */
+export function parseQuestions(text) {
+  const s = String(text || "");
+  // The diagram inside the JSON may contain ``` itself, so try the outermost braces first, then a fenced block.
+  const candidates = [s.slice(s.indexOf("{"), s.lastIndexOf("}") + 1), (s.match(/```(?:json)?\s*([\s\S]*?)```/) || [])[1]];
+  let j = null;
+  for (const c of candidates) {
+    if (!c) continue;
+    try { j = JSON.parse(c); break; } catch {}
+  }
+  if (!j || typeof j !== "object") return { questions: [], diagram: "", note: "", error: "Claude's questions couldn't be read." };
+  const questions = (Array.isArray(j.questions) ? j.questions : [])
+    .slice(0, 8)
+    .map((q) => ({
+      question: String(q?.question || "").trim().slice(0, 300),
+      options: (Array.isArray(q?.options) ? q.options : []).map((o) => String(o).trim().slice(0, 200)).filter(Boolean).slice(0, 5),
+      multiple: !!q?.multiple,
+    }))
+    .filter((q) => q.question);
+  const diagram = typeof j.diagram === "string" ? j.diagram.replace(/^```(?:mermaid)?\s*|```\s*$/g, "").trim().slice(0, 20000) : "";
+  return { questions, diagram, note: String(j.note || "").trim().slice(0, 300) };
 }
 
 /** Import: files are already copied into `folder`; Claude writes the idea README from the code. */
@@ -386,7 +467,15 @@ ${await example()}
 
 /* ---------- test doubles: IDEA_COOKER_FAKE=1 skips Claude ---------- */
 
-async function fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, rules = [] }) {
+async function fakeArch(dir, shown, design, log, emit) {
+  if (design?.answers?.length) log(`Design answers: ${design.answers.length}`);
+  if (!design?.plan) return;
+  await fs.writeFile(path.join(dir, "ARCHITECTURE.md"), `# Architecture\n\nTest plan.\n\n\`\`\`mermaid\n${design.plan.trim()}\n\`\`\`\n`);
+  log(`Write ${shown}/ARCHITECTURE.md`);
+  emit({ kind: "tool", text: `Wrote ${shown}/ARCHITECTURE.md` });
+}
+
+async function fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, rules = [], design = null }) {
   if (rules.length) log(`Rules: ${rules.map((r) => r.title || "untitled").join(", ")}`);
   if (saveOnly) {
     const slug = idea.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").split("-").slice(0, 3).join("-") || "idea";
@@ -412,10 +501,12 @@ async function fakeCook({ root, idea, date, existingLower, log, emit, saveOnly, 
   await fs.writeFile(path.join(root, folder, "index.html"), `<!doctype html><title>${folder}</title><h1>${folder}</h1>\n`);
   log(`Write ${folder}/index.html`);
   emit({ kind: "tool", text: `Wrote ${folder}/index.html` });
+  await fakeArch(path.join(root, folder), folder, design, log, emit);
   return { folder, sessionId: `fake-${folder}`, reply: `[fake] Built a test page for “${idea.slice(0, 40)}”.` };
 }
 
-async function fakeRevise({ root, folder, message, log, emit, clone, cloneLabel, demo }) {
+async function fakeRevise({ root, folder, message, log, emit, clone, cloneLabel, demo, design = null }) {
+  await fakeArch(path.join(root, folder), folder, design, log, emit);
   const file = clone ? path.join(clone, "CHANGES.md") : path.join(root, folder, "CHANGES.md");
   const shown = clone ? `${cloneLabel}/CHANGES.md` : `${folder}/CHANGES.md`;
   await fs.appendFile(file, `- ${message}\n`);

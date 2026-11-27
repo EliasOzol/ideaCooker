@@ -158,6 +158,46 @@
   .md code { font: 13px/1 var(--mono); padding: 2px 4px; border-radius: 4px; background: var(--sunk); }
   .md pre { padding: 12px 16px; border-radius: var(--radius); background: var(--sunk); overflow-x: auto; }
   .md pre code { padding: 0; background: none; font-size: 13px; line-height: 20px; }
+  dialog.ask { width: min(720px, calc(100vw - 32px)); }
+  .dlg-foot .spacer { flex: 1; }
+  .ask-list { display: grid; gap: 16px; }
+  .ask-q { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .ask-q legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 15px; }
+  .ask-q .multi { font-weight: 400; color: var(--ink-3); font-size: 13px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 18px; font-size: 14px; cursor: pointer; transition: border-color .15s, background-color .15s, color .15s; }
+  .pill:hover { border-color: var(--ink-3); }
+  .pill input { position: absolute; opacity: 0; pointer-events: none; }
+  .pill:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .pill:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .pill .rec { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .ask-q input[type=text] { background: var(--bg); }
+  .ask-plan { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .ask-plan textarea { width: 100%; min-height: 160px; padding: 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--bg); font: 13px/20px var(--mono); resize: vertical; }
+  .arch-edit { height: 100%; display: flex; flex-direction: column; }
+  .arch-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .arch-bar .spacer { flex: 1; }
+  .arch-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .arch-split textarea { border: 0; border-right: 1px solid var(--line); padding: 16px; resize: none; background: var(--bg); font: 13px/20px var(--mono); color: var(--ink); outline: none; tab-size: 2; }
+  .arch-split textarea:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+  .arch-preview { overflow: auto; padding: 16px 24px; }
+  @container (max-width: 640px) { .arch-split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } .arch-split textarea { border-right: 0; border-bottom: 1px solid var(--line); } }
+  .panel-body { container-type: inline-size; }
+  .arch-empty { max-width: 480px; margin: 48px auto 0; text-align: center; }
+  .arch-empty p { margin: 0 0 8px; }
+  .arch-empty .row { display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+  .arch-tools { max-width: 680px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .small { font-size: 13px; }
+  .msg.note { justify-self: center; font-size: 13px; color: var(--ink-3); }
+  .answers { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-2); white-space: normal; }
+  .answers summary { cursor: pointer; }
+  .answers dl { margin: 8px 0 0; display: grid; gap: 4px; }
+  .answers dt { color: var(--ink-3); }
+  .answers dd { margin: 0 0 4px; color: var(--ink); }
+  .mmd { margin: 0 0 16px; padding: 16px; border-radius: var(--radius); background: var(--bg); overflow-x: auto; text-align: center; }
+  .mmd svg { max-width: 100%; height: auto; }
+  .mmd-err { margin: 0 0 8px; font-size: 13px; color: var(--red); text-align: left; }
+  .mmd pre { text-align: left; }
 
   /* dialogs */
   dialog { width: min(560px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 16px 48px rgb(0 0 0 / .18); }
@@ -191,6 +231,8 @@
   .switch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
   .switch input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
   .choice { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .select { height: 40px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--bg); font-size: 15px; }
+  .select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
   .opt { display: grid; grid-template-columns: 16px 1fr; gap: 12px; align-items: start; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; transition: border-color .15s, background-color .15s; }
   .opt:hover { border-color: var(--line-strong); }
   .opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
@@ -277,6 +319,7 @@
       <div class="tabs" role="tablist">
         <button role="tab" id="tabProto" aria-selected="true" type="button">Prototype</button>
         <button role="tab" id="tabReadme" aria-selected="false" type="button">README</button>
+        <button role="tab" id="tabArch" aria-selected="false" type="button" title="Architecture diagrams you can view and edit">Architecture</button>
         <button role="tab" id="tabCode" aria-selected="false" type="button" class="hidden" title="The linked repo's own README">Code</button>
       </div>
       <span class="spacer"></span>
@@ -317,6 +360,31 @@
   </form>
 </dialog>
 
+<dialog id="askDlg" class="ask" aria-labelledby="askTitle">
+  <form class="dlg" method="dialog" id="askForm">
+    <div>
+      <h2 id="askTitle">Before Claude builds</h2>
+      <p class="hint2" id="askNote"></p>
+    </div>
+    <div id="askQuestions" class="ask-list"></div>
+    <section id="askPlan" class="ask-plan hidden">
+      <div class="rules-head">
+        <label>Planned architecture</label>
+        <button class="btn ghost" type="button" id="askPlanEdit">Edit diagram</button>
+      </div>
+      <p class="hint2">Claude builds to match this. Change it if it isn't what you want.</p>
+      <div class="md" id="askPlanView"></div>
+      <textarea id="askPlanSrc" class="hidden" spellcheck="false" aria-label="Planned architecture (Mermaid)"></textarea>
+    </section>
+    <div class="dlg-foot">
+      <button class="btn ghost" type="button" id="askBack">Back to my message</button>
+      <span class="spacer"></span>
+      <button class="btn" type="button" id="askSkip">Skip questions</button>
+      <button class="btn primary" type="button" id="askGo">Build it</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="removeDlg" aria-labelledby="removeTitle">
   <form class="dlg" method="dialog">
     <h2 id="removeTitle">Remove idea?</h2>
@@ -342,6 +410,15 @@
       <p class="err hidden" id="repoError"></p>
     </div>
     <label class="check"><input type="checkbox" id="pushBox"> Push to GitHub after each commit</label>
+    <div class="field">
+      <label for="askSel">Design questions before building</label>
+      <select id="askSel" class="select">
+        <option value="always">Before every build or change</option>
+        <option value="new">Only before new prototypes</option>
+        <option value="never">Never, just build</option>
+      </select>
+      <p class="hint2">Claude asks what it needs to know first, with options to click, and shows the planned architecture for bigger builds so you can edit it. For small, clear changes it may have no questions and just build.</p>
+    </div>
     <div class="field">
       <label class="check"><input type="checkbox" id="cmdBox"> Let Claude run commands</label>
       <p class="hint2">Claude can then run tests and scripts and start local servers (like a test site) to check its own work, in the idea's folder or linked repo. This runs code on this PC. Git, publishing, global installs and system commands stay blocked, and the app still does all commits and pushes.</p>
@@ -434,11 +511,14 @@ function md(src) {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     let m;
-    if ((m = l.match(/^```/))) {
+    if ((m = l.match(/^```\s*([\w-]*)/))) {
       flushPara(); flushList();
       const code = [];
       while (++i < lines.length && !/^```/.test(lines[i])) code.push(lines[i]);
-      out += `<pre><code>${esc(code.join("\n"))}</code></pre>`;
+      // Mermaid blocks become diagrams (drawn by renderDiagrams after the HTML is in the page).
+      out += m[1].toLowerCase() === "mermaid"
+        ? `<div class="mmd" data-src="${esc(code.join("\n"))}"><span class="muted">Drawing diagram…</span></div>`
+        : `<pre><code>${esc(code.join("\n"))}</code></pre>`;
     } else if ((m = l.match(/^(#{1,3})\s+(.*)/))) {
       flushPara(); flushList();
       out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`;
@@ -466,6 +546,43 @@ function md(src) {
   }
   flushPara(); flushList();
   return out;
+}
+
+/* ---------- diagrams (Mermaid, served locally from /vendor) ---------- */
+let mermaidInit = null;
+let mmdSeq = 0;
+function loadMermaid() {
+  if (mermaidInit) return mermaidInit;
+  mermaidInit = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "/vendor/mermaid.min.js";
+    s.onload = () => {
+      const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+      window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "neutral", fontFamily: "Segoe UI, system-ui, sans-serif" });
+      resolve(window.mermaid);
+    };
+    s.onerror = () => { mermaidInit = null; reject(new Error("Couldn't load the diagram library.")); };
+    document.head.appendChild(s);
+  });
+  return mermaidInit;
+}
+/* Draw every .mmd block inside `root`; a broken diagram shows its error and source instead. */
+async function renderDiagrams(root) {
+  const blocks = [...root.querySelectorAll(".mmd:not([data-done])")];
+  if (!blocks.length) return;
+  let mermaid;
+  try { mermaid = await loadMermaid(); } catch (e) { blocks.forEach((b) => (b.innerHTML = `<p class="mmd-err">${esc(e.message)}</p>`)); return; }
+  for (const b of blocks) {
+    b.dataset.done = "1";
+    const src = b.dataset.src || "";
+    try {
+      const { svg } = await mermaid.render(`mmd-${++mmdSeq}`, src);
+      b.innerHTML = svg;
+    } catch (e) {
+      document.getElementById(`dmmd-${mmdSeq}`)?.remove(); // Mermaid can leave its scratch element behind
+      b.innerHTML = `<p class="mmd-err">This diagram has an error: ${esc(String(e?.message || e).split("\n")[0].slice(0, 200))}</p><pre><code>${esc(src)}</code></pre>`;
+    }
+  }
 }
 
 /* ---------- loading ---------- */
@@ -529,7 +646,13 @@ function phase(job) {
 }
 
 function messageHtml(m) {
-  if (m.role === "user") return `<div class="msg user">${esc(m.text)}</div>`;
+  if (m.role === "note") return `<div class="msg note">${esc(m.text)}</div>`;
+  if (m.role === "user") {
+    const answers = (m.answers || []).length || m.plan
+      ? `<details class="answers"><summary>Your design answers${m.plan ? " and approved architecture" : ""}</summary><dl>${(m.answers || []).map((a) => `<dt>${esc(a.question)}</dt><dd>${esc(a.answer)}</dd>`).join("")}</dl></details>`
+      : "";
+    return `<div class="msg user">${esc(m.text)}${answers}</div>`;
+  }
   const tools = (m.tools || []).length ? `<div class="tools">${[...new Set(m.tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
   return `<div class="msg assistant${m.error ? " error" : ""}"><div class="body md">${m.error ? esc(m.text) : md(m.text)}</div>${tools}</div>`;
 }
@@ -547,7 +670,7 @@ function pendingHtml(p) {
     steps = `<ul class="steps">${labels.map(([k, l]) => `<li class="${s[k]}"><span class="ind"></span>${l}</li>`).join("")}</ul>`;
   }
   const chips = tools.length ? `<div class="tools">${[...new Set(tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
-  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…", remove: "Removing…" }[p.kind] || (p.saveOnly ? "Saving your idea…" : "Cooking your idea…");
+  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…", remove: "Removing…", questions: "Claude is reading up and preparing questions…", arch: "Saving the diagram…" }[p.kind] || (p.saveOnly ? "Saving your idea…" : "Cooking your idea…");
   return `${p.userText ? `<div class="msg user">${esc(p.userText)}</div>` : ""}
     <div class="msg assistant"><div class="working"><span class="spinner"></span>${label}</div>${steps}${chips}</div>`;
 }
@@ -603,6 +726,7 @@ function renderChat() {
   const o = state.offer;
   if (o && o.folder === state.folder && !p) parts.push(`<div class="msg user enter">${esc(o.text)}</div>`, offerHtml(o));
   $("threadInner").innerHTML = parts.join("");
+  renderDiagrams($("threadInner"));
   const t = $("thread");
   t.scrollTop = t.scrollHeight;
 
@@ -650,7 +774,7 @@ function renderPanel() {
   $("tabProto").disabled = !hasProto;
   $("tabProto").title = hasProto ? "" : idea.repo ? "This project needs a build step, so it can't be previewed here" : "No web page to preview";
   $("tabCode").classList.toggle("hidden", !hasCode);
-  for (const [id, t] of [["tabProto", "proto"], ["tabReadme", "readme"], ["tabCode", "code"]]) $(id).setAttribute("aria-selected", String(state.tab === t));
+  for (const [id, t] of [["tabProto", "proto"], ["tabReadme", "readme"], ["tabArch", "arch"], ["tabCode", "code"]]) $(id).setAttribute("aria-selected", String(state.tab === t));
 
   const sel = $("statusSel");
   sel.innerHTML = (idea.status ? "" : `<option value="">No status</option>`) + Object.entries(LABELS).map(([k, l]) => `<option value="${k}"${idea.status === k ? " selected" : ""}>${l}</option>`).join("");
@@ -668,6 +792,9 @@ function renderPanel() {
       body.innerHTML = `<iframe title="Prototype of ${esc(titleOf(idea))}" data-src="${esc(src)}" src="${esc(src)}"></iframe>`;
     }
     $("openTab").href = src;
+  } else if (state.tab === "arch") {
+    $("openTab").href = `${base}ARCHITECTURE.md`;
+    return renderArch(idea, body);
   } else {
     const which = state.tab === "code" ? "repo" : "idea";
     // Linked ideas open their GitHub page; others open the README file itself.
@@ -682,12 +809,103 @@ function renderPanel() {
           if (body.dataset.readme !== key || state.tab !== tab) return;
           body.innerHTML = `<div class="readme">${noPreviewBar(idea)}<div class="md">${md(text)}</div></div>`;
           body.querySelectorAll("a[data-rel]").forEach((a) => { a.href = base + a.dataset.rel; a.target = "_blank"; a.rel = "noopener"; });
+          renderDiagrams(body);
         })
         .catch(() => { body.innerHTML = `<div class="panel-empty">This idea has no README yet.</div>`; });
     }
     return;
   }
   delete body.dataset.readme;
+}
+
+/* ---------- architecture tab: view the diagrams, or edit them yourself ---------- */
+const ARCH_REQUEST = "Draw the architecture of this idea as UML diagrams in ARCHITECTURE.md: the parts and how data moves between them, plus a class or sequence diagram where it helps.";
+const ARCH_TEMPLATE = "# Architecture\n\nHow the parts of this idea fit together.\n\n```mermaid\nflowchart LR\n  User([User]) --> UI[Page]\n  UI --> Logic[Logic]\n  Logic --> Store[(Storage)]\n```\n";
+
+function renderArch(idea, body) {
+  const ed = state.archEdit;
+  if (ed && ed.folder === idea.folder) {
+    if (body.dataset.readme === `arch-edit:${idea.folder}`) return;
+    body.dataset.readme = `arch-edit:${idea.folder}`;
+    body.innerHTML = `<div class="arch-edit">
+      <div class="arch-bar">
+        <span class="small"><strong>Editing the architecture</strong> <span class="muted">· Mermaid in Markdown · <a href="https://mermaid.js.org/intro/syntax-reference.html" target="_blank" rel="noopener">syntax</a></span></span>
+        <span class="spacer"></span>
+        <button class="btn" type="button" id="archCancel">Cancel</button>
+        <button class="btn primary" type="button" id="archSave">Save</button>
+      </div>
+      <div class="arch-split">
+        <textarea id="archSrc" spellcheck="false" aria-label="Architecture source"></textarea>
+        <div class="arch-preview md" id="archPreview" aria-live="polite"></div>
+      </div>
+    </div>`;
+    const src = $("archSrc");
+    src.value = ed.text;
+    const preview = () => { $("archPreview").innerHTML = md(src.value); renderDiagrams($("archPreview")); };
+    let t;
+    src.addEventListener("input", () => { ed.text = src.value; ed.dirty = true; clearTimeout(t); t = setTimeout(preview, 450); });
+    src.addEventListener("keydown", (e) => {
+      if (e.key === "Tab") { e.preventDefault(); src.setRangeText("  ", src.selectionStart, src.selectionEnd, "end"); src.dispatchEvent(new Event("input")); }
+      if (e.key === "s" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("archSave").click(); }
+    });
+    $("archCancel").addEventListener("click", () => { if (!ed.dirty || confirm("Discard your changes to the diagram?")) { state.archEdit = null; renderPanel(); } });
+    $("archSave").addEventListener("click", saveArch);
+    preview();
+    src.focus();
+    return;
+  }
+  const key = `arch:${idea.folder}:${state.previewVersion}:${idea.hasArch}`;
+  if (body.dataset.readme === key) return;
+  body.dataset.readme = key;
+  const busy = state.pending ? " disabled" : "";
+  if (!idea.hasArch) {
+    body.innerHTML = `<div class="readme"><div class="arch-empty">
+      <p><strong>No architecture diagram yet.</strong></p>
+      <p class="muted">Claude draws one for bigger builds. You can also ask for one now, or draw it yourself and Claude will build to match it.</p>
+      <div class="row"><button class="btn primary" type="button" data-ask="${esc(ARCH_REQUEST)}"${busy}>Ask Claude to draw it</button><button class="btn" type="button" data-arch-edit${busy}>Draw it myself</button></div>
+    </div></div>`;
+    return;
+  }
+  body.innerHTML = `<div class="readme"><div class="md muted">Loading…</div></div>`;
+  api("GET", `/api/ideas/${encodeURIComponent(idea.folder)}/readme?which=arch`)
+    .then(({ text }) => {
+      if (body.dataset.readme !== key || state.tab !== "arch") return;
+      state.archText = text;
+      body.innerHTML = `<div class="readme"><div class="arch-tools"><span class="muted small">Edit it to change the design; Claude builds to match your version.</span><button class="btn" type="button" data-arch-edit${busy}>Edit</button></div><div class="md">${md(text)}</div></div>`;
+      renderDiagrams(body);
+    })
+    .catch(() => { body.innerHTML = `<div class="panel-empty">Couldn't load ARCHITECTURE.md.</div>`; });
+}
+
+function startArchEdit() {
+  const idea = current();
+  if (!idea || state.pending) return;
+  state.archEdit = { folder: idea.folder, text: idea.hasArch && state.archText ? state.archText : ARCH_TEMPLATE, dirty: !idea.hasArch };
+  state.tab = "arch";
+  renderPanel();
+}
+
+async function saveArch() {
+  const ed = state.archEdit;
+  if (!ed || state.pending) return;
+  $("archSave").disabled = true;
+  const job = await runJob("arch", () => api("POST", `/api/ideas/${encodeURIComponent(ed.folder)}/architecture`, { content: ed.text }), "", ed.folder);
+  if (job?.state === "done") {
+    state.archEdit = null;
+    await loadChat();
+  } else if ($("archSave")) {
+    $("archSave").disabled = false;
+  }
+  renderAll();
+}
+
+/* Leaving the editor with unsaved changes asks first. Returns false to stay. */
+function leaveArchEdit() {
+  const ed = state.archEdit;
+  if (!ed) return true;
+  if (ed.dirty && !confirm("Discard your changes to the diagram?")) return false;
+  state.archEdit = null;
+  return true;
 }
 
 function renderAll() {
@@ -698,6 +916,10 @@ function renderAll() {
 
 /* ---------- navigation ---------- */
 async function select(folder) {
+  if ((folder || null) !== state.folder && !leaveArchEdit()) {
+    history.replaceState(null, "", state.folder ? `#/${state.folder}` : "#/");
+    return;
+  }
   state.folder = folder || null;
   state.tab = "proto";
   state.offer = null;
@@ -745,7 +967,7 @@ async function follow(jobId, kind, userText, folder, extra = {}) {
   await loadIdeas();
   if (job.state === "done") {
     state.previewVersion = Date.now();
-    if (kind !== "status") state.panelOpen = true; // show what changed, like a chat app opening its canvas
+    if (!["status", "questions", "arch", "remove"].includes(kind)) state.panelOpen = true; // show what changed, like a chat app opening its canvas
   } else showError(job.error || "Something went wrong.");
   return job;
 }
@@ -839,12 +1061,98 @@ async function send(force = false) {
   autosize();
   const folder = state.folder;
   const saveOnly = !folder && $("saveOnly").checked;
-  const job = await runJob(folder ? "revise" : "cook", () => api("POST", "/api/chat", { folder, message: text, saveOnly }), text, folder, { saveOnly });
+
+  // Design questions first (per the setting); the user answers, edits the plan, skips, or goes back.
+  let design = { answers: [], plan: "" };
+  if (!saveOnly && wantsQuestions(folder, text)) {
+    const q = await runJob("questions", () => api("POST", "/api/questions", { folder, message: text }), text, folder);
+    if (!q) { $("input").value = text; autosize(); updateSend(); return; }
+    renderAll();
+    if (q.state === "done" && (q.result.questions.length || q.result.diagram)) {
+      const choice = await askUser(q.result);
+      if (!choice) { $("input").value = text; autosize(); updateSend(); $("input").focus(); return; }
+      design = choice;
+    } else if (q.state !== "done") {
+      $("chatError").classList.add("hidden"); // asking failed: just build without questions
+    }
+  }
+
+  const job = await runJob(folder ? "revise" : "cook", () => api("POST", "/api/chat", { folder, message: text, saveOnly, answers: design.answers, plan: design.plan }), text, folder, { saveOnly });
   if (!job) { $("input").value = text; autosize(); updateSend(); return; }
   if (!folder && job.state === "done") return select(job.result.folder);
   if (!folder && job.state !== "done") { $("input").value = text; autosize(); }
   if (state.folder === folder) await loadChat();
   renderAll();
+}
+
+/* ---------- design questions before building ---------- */
+function wantsQuestions(folder, text) {
+  const mode = state.config.askQuestions || "always";
+  if (mode === "never") return false;
+  if (mode === "always") return true;
+  // "new": new prototypes, including building the first prototype of a saved idea
+  return !folder || text === BUILD_REQUEST;
+}
+
+/* Show the questions popup. Resolves to { answers, plan } or null when the user goes back. */
+function askUser({ questions, diagram, note }) {
+  return new Promise((resolve) => {
+    $("askNote").textContent = note || "A few questions so the result is what you have in mind. Pick an option or write your own answer.";
+    $("askQuestions").innerHTML = questions.map((q, i) => `
+      <fieldset class="ask-q" data-q="${i}">
+        <legend>${esc(q.question)}${q.multiple ? ` <span class="multi">(pick any)</span>` : ""}</legend>
+        ${q.options.length ? `<div class="pills">${q.options.map((o, j) => `<label class="pill"><input type="${q.multiple ? "checkbox" : "radio"}" name="q${i}" value="${esc(o)}"${j === 0 ? " checked" : ""}>${esc(o)}${j === 0 ? ` <span class="rec">recommended</span>` : ""}</label>`).join("")}</div>` : ""}
+        <input type="text" class="own" placeholder="${q.options.length ? "Or write your own answer…" : "Your answer…"}" aria-label="Your own answer to: ${esc(q.question)}">
+      </fieldset>`).join("");
+    // Typing your own answer replaces the picked option (for single-choice questions).
+    $("askQuestions").querySelectorAll(".ask-q").forEach((fs) => {
+      const own = fs.querySelector(".own");
+      own.addEventListener("input", () => { if (own.value.trim()) fs.querySelectorAll('input[type=radio]').forEach((r) => (r.checked = false)); });
+      fs.querySelectorAll("input[type=radio]").forEach((r) => r.addEventListener("change", () => (own.value = "")));
+    });
+
+    const planOn = !!diagram;
+    $("askPlan").classList.toggle("hidden", !planOn);
+    $("askPlanSrc").classList.add("hidden");
+    $("askPlanView").classList.remove("hidden");
+    $("askPlanEdit").textContent = "Edit diagram";
+    $("askPlanSrc").value = diagram || "";
+    const drawPlan = () => { $("askPlanView").innerHTML = md("```mermaid\n" + $("askPlanSrc").value + "\n```"); renderDiagrams($("askPlanView")); };
+    if (planOn) drawPlan();
+
+    const collect = () => {
+      const answers = [];
+      $("askQuestions").querySelectorAll(".ask-q").forEach((fs, i) => {
+        const picked = [...fs.querySelectorAll("input:checked")].map((x) => x.value);
+        const own = fs.querySelector(".own").value.trim();
+        const answer = [...picked, ...(own ? [own] : [])].join("; ");
+        if (answer) answers.push({ question: questions[i].question, answer });
+      });
+      return { answers, plan: planOn ? $("askPlanSrc").value.trim() : "" };
+    };
+    const dlg = $("askDlg");
+    const done = (v) => {
+      dlg.removeEventListener("cancel", onCancel);
+      $("askGo").onclick = $("askSkip").onclick = $("askBack").onclick = $("askPlanEdit").onclick = null;
+      $("askPlanSrc").oninput = null;
+      if (dlg.open) dlg.close();
+      resolve(v);
+    };
+    const onCancel = (e) => { e.preventDefault(); done(null); };
+    dlg.addEventListener("cancel", onCancel);
+    $("askGo").onclick = () => done(collect());
+    $("askSkip").onclick = () => done({ answers: [], plan: planOn ? $("askPlanSrc").value.trim() : "" });
+    $("askBack").onclick = () => done(null);
+    let t;
+    $("askPlanSrc").oninput = () => { clearTimeout(t); t = setTimeout(drawPlan, 450); };
+    $("askPlanEdit").onclick = () => {
+      const editing = $("askPlanSrc").classList.toggle("hidden") === false;
+      $("askPlanEdit").textContent = editing ? "Hide source" : "Edit diagram";
+      if (editing) $("askPlanSrc").focus();
+    };
+    dlg.showModal();
+    (dlg.querySelector(".pill input") || $("askGo")).focus();
+  });
 }
 
 /* ---------- events ---------- */
@@ -931,6 +1239,7 @@ function setMax(on) {
 }
 $("maxBtn").addEventListener("click", () => setMax(!$("app").classList.contains("panel-max")));
 $("panelBody").addEventListener("click", (e) => {
+  if (e.target.closest("[data-arch-edit]")) return startArchEdit();
   const b = e.target.closest("[data-ask]");
   if (!b || state.pending) return;
   $("input").value = b.dataset.ask;
@@ -943,9 +1252,11 @@ document.addEventListener("keydown", (e) => {
   else setPanel(false);
 });
 
-$("tabProto").addEventListener("click", () => { state.tab = "proto"; renderPanel(); });
-$("tabReadme").addEventListener("click", () => { state.tab = "readme"; renderPanel(); });
-$("tabCode").addEventListener("click", () => { state.tab = "code"; renderPanel(); });
+const goTab = (t) => { if (state.tab !== t && !leaveArchEdit()) return; state.tab = t; renderPanel(); };
+$("tabProto").addEventListener("click", () => goTab("proto"));
+$("tabReadme").addEventListener("click", () => goTab("readme"));
+$("tabArch").addEventListener("click", () => goTab("arch"));
+$("tabCode").addEventListener("click", () => goTab("code"));
 $("reloadBtn").addEventListener("click", () => { state.previewVersion = Date.now(); renderPanel(); });
 
 $("statusSel").addEventListener("change", async () => {
@@ -1084,6 +1395,7 @@ function openSettings() {
   $("repoPath").value = c.repoPath || "";
   $("pushBox").checked = c.push !== false;
   $("cmdBox").checked = !!c.allowCommands;
+  $("askSel").value = c.askQuestions || "always";
   $("modelBox").value = c.model || "";
   $("repoFacts").classList.add("hidden");
   $("repoError").classList.add("hidden");
@@ -1119,7 +1431,7 @@ $("checkBtn").addEventListener("click", checkRepo);
 $("repoPath").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkRepo(); } });
 $("saveBtn").addEventListener("click", async () => {
   const p = $("repoPath").value.trim();
-  const body = { push: $("pushBox").checked, model: $("modelBox").value, rules: collectRules(), allowCommands: $("cmdBox").checked };
+  const body = { push: $("pushBox").checked, model: $("modelBox").value, rules: collectRules(), allowCommands: $("cmdBox").checked, askQuestions: $("askSel").value };
   if (p && (p !== state.config.repoPath || !state.config.confirmed)) {
     if (checkedPath !== p && !(await checkRepo())) return;
     body.repoPath = p;

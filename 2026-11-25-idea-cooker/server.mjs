@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { inspectRepo, pullIfRemote, commitAndPush } from "./lib/git.mjs";
 import { listIdeas, updateIdeaStatus, STATUSES } from "./lib/ideas.mjs";
-import { cookIdea, reviseIdea, describeImport, describeLinked, today } from "./lib/generate.mjs";
+import { cookIdea, reviseIdea, describeImport, describeLinked, askQuestions, today } from "./lib/generate.mjs";
 import { importIntoRepo, kebab } from "./lib/importer.mjs";
 import { chatStore } from "./lib/chats.mjs";
 import { parseRepoUrl, readLink, writeLink, ensureClone, cloneDir, firstCommitDate, commitClone, staticEntry } from "./lib/linked.mjs";
@@ -21,11 +21,13 @@ const PUBLIC_DIR = path.join(here, "public");
 const REPOS_DIR = process.env.IDEA_COOKER_REPOS || path.join(here, "repos");
 const FOLDER_RE = /^\d{4}-\d{2}-\d{2}-[\w.-]+$/;
 const DEMO_FILE = "demo.html"; // dummy-data demo for linked repos that can't be previewed as they are
+const ARCH_FILE = "ARCHITECTURE.md"; // Mermaid diagrams of the idea's design; Claude and the user both edit it
+const MERMAID_JS = path.join(here, "node_modules", "mermaid", "dist", "mermaid.min.js");
 
 // ---------- config ----------
 async function loadConfig() {
   try {
-    return { push: true, model: "", ...JSON.parse(await fs.readFile(CONFIG_FILE, "utf8")) };
+    return { push: true, model: "", askQuestions: "always", ...JSON.parse(await fs.readFile(CONFIG_FILE, "utf8")) };
   } catch {
     return { repoPath: "", confirmed: false, push: true, model: "" };
   }
@@ -46,6 +48,17 @@ function cleanRules(list) {
     .filter((r) => r.title || r.text);
 }
 const activeRules = (cfg) => (cfg.rules || []).filter((r) => r.enabled && r.text);
+
+/** Answers to the pre-build questions and the approved planned diagram, as sent by the page. */
+function cleanDesign(answers, plan) {
+  const list = Array.isArray(answers) ? answers.slice(0, 20) : [];
+  return {
+    answers: list
+      .map((a) => ({ question: String(a?.question || "").slice(0, 500).trim(), answer: String(a?.answer || "").slice(0, 2000).trim() }))
+      .filter((a) => a.question && a.answer),
+    plan: typeof plan === "string" && plan.trim() ? plan.slice(0, 30_000) : "",
+  };
+}
 
 async function requireRepo() {
   const cfg = await loadConfig();
@@ -164,6 +177,7 @@ async function handle(req, res) {
     if (typeof body.model === "string") cfg.model = body.model.trim();
     if (Array.isArray(body.rules)) cfg.rules = cleanRules(body.rules);
     if (typeof body.allowCommands === "boolean") cfg.allowCommands = body.allowCommands;
+    if (["always", "new", "never"].includes(body.askQuestions)) cfg.askQuestions = body.askQuestions;
     await saveConfig(cfg);
     return send(res, 200, cfg);
   }
@@ -176,6 +190,7 @@ async function handle(req, res) {
     for (const i of ideas) {
       i.hasChat = await chats.has(i.folder);
       i.isApp = i.folder === appFolder;
+      i.hasArch = i.files.includes(ARCH_FILE);
       const link = await readLink(cfg.repoPath, i.folder);
       if (link) {
         const repo = parseRepoUrl(link.repo);
@@ -197,6 +212,7 @@ async function handle(req, res) {
     const cfg = await requireRepo();
     const folder = checkFolder(m[1]);
     let file = path.join(cfg.repoPath, folder, "README.md");
+    if (url.searchParams.get("which") === "arch") file = path.join(cfg.repoPath, folder, ARCH_FILE);
     if (url.searchParams.get("which") === "repo") {
       const link = await readLink(cfg.repoPath, folder);
       if (!link) throw httpError(404, "This idea has no linked repo");
@@ -259,19 +275,21 @@ async function handle(req, res) {
   // One endpoint for the chat box: no folder = cook a new idea, a folder = change that idea.
   if (req.method === "POST" && p === "/api/chat") {
     const cfg = await requireRepo();
-    const { folder, message, saveOnly } = await readJson(req);
+    const { folder, message, saveOnly, answers, plan } = await readJson(req);
     const text = String(message || "").trim();
     if (!text) throw httpError(400, "Write a message first.");
+    const design = cleanDesign(answers, plan);
+    const userMsg = () => ({ role: "user", text, at: now(), ...(design.answers.length ? { answers: design.answers } : {}), ...(design.plan ? { plan: true } : {}) });
 
     if (!folder) {
       const job = startJob("cook", { folder: null, text, saveOnly: !!saveOnly }, async ({ log, emit, job }) => {
         await pullIfRemote(cfg.repoPath, log);
-        const r = await cookIdea({ repoPath: cfg.repoPath, idea: text, model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit, saveOnly: !!saveOnly });
+        const r = await cookIdea({ repoPath: cfg.repoPath, idea: text, design, model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit, saveOnly: !!saveOnly });
         job.folder = r.folder;
         log(`Created ${r.folder}/`);
         const g = await commitAndPush(cfg.repoPath, [r.folder], `${saveOnly ? "Saved idea" : "Daily idea"}: ${r.folder}\n\n${text.split("\n")[0].slice(0, 72)}`, { push: cfg.push, log });
         await chats.append(r.folder, [
-          { role: "user", text, at: now() },
+          userMsg(),
           { role: "assistant", text: r.reply, tools: toolsOf(job), at: now() },
         ], r.sessionId);
         return { folder: r.folder, reply: r.reply, ...g };
@@ -290,25 +308,69 @@ async function handle(req, res) {
         const repo = link ? parseRepoUrl(link.repo) : null;
         const clone = repo ? await ensureClone(REPOS_DIR, repo, log) : null;
         const demo = clone ? { exists: !!(await fs.stat(path.join(cfg.repoPath, folder, DEMO_FILE)).catch(() => null)), projectEntry: await staticEntry(clone) } : null;
-        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, demo, model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit, clone, cloneLabel: repo?.label });
+        const r = await reviseIdea({ repoPath: cfg.repoPath, folder, message: text, design, sessionId: chat.sessionId, demo, model: cfg.model, rules: activeRules(cfg), allowCommands: !!cfg.allowCommands, log, emit, clone, cloneLabel: repo?.label });
         const summary = text.split("\n")[0].slice(0, 72);
         let code = null;
         if (clone) code = await commitClone(clone, `${summary}\n\nMade with Idea Cooker.`, { push: cfg.push, log, label: repo.label });
         const g = await commitAndPush(cfg.repoPath, [folder], `Update ${folder}\n\n${summary}`, { push: cfg.push, log });
         await chats.append(folder, [
-          { role: "user", text, at: now() },
+          userMsg(),
           { role: "assistant", text: r.reply, tools: toolsOf(job), at: now() },
         ], r.sessionId);
         return { folder, reply: r.reply, ...g, code };
       } catch (e) {
         await chats.append(folder, [
-          { role: "user", text, at: now() },
+          userMsg(),
           { role: "assistant", text: e.message, error: true, tools: toolsOf(job), at: now() },
         ]);
         throw e;
       }
     });
     return send(res, 202, { jobId: job.id });
+  }
+
+  // Before building: Claude reads what it needs and returns design questions (and, for bigger builds,
+  // a planned architecture diagram) for the user to answer and edit. Nothing is written or committed.
+  if (req.method === "POST" && p === "/api/questions") {
+    const cfg = await requireRepo();
+    const { folder, message } = await readJson(req);
+    const text = String(message || "").trim();
+    if (!text) throw httpError(400, "Write a message first.");
+    if (folder) checkFolder(folder);
+    const job = startJob("questions", { folder: folder || null, text }, async ({ log }) => {
+      const link = folder ? await readLink(cfg.repoPath, folder) : null;
+      const repo = link ? parseRepoUrl(link.repo) : null;
+      const clone = repo ? await ensureClone(REPOS_DIR, repo, log) : null;
+      return askQuestions({ repoPath: cfg.repoPath, folder, message: text, clone, cloneLabel: repo?.label, model: cfg.model, rules: activeRules(cfg), log });
+    });
+    return send(res, 202, { jobId: job.id });
+  }
+
+  // The user edits ARCHITECTURE.md in the panel: save, commit, push, and note it in the chat for Claude.
+  if (req.method === "POST" && (m = p.match(/^\/api\/ideas\/([\w.-]+)\/architecture$/))) {
+    const cfg = await requireRepo();
+    const folder = checkFolder(m[1]);
+    const { content } = await readJson(req);
+    const text = String(content ?? "");
+    if (!text.trim()) throw httpError(400, "The diagram is empty.");
+    if (text.length > 90_000) throw httpError(413, "That's too long.");
+    if (!(await fs.stat(path.join(cfg.repoPath, folder)).catch(() => null))?.isDirectory()) throw httpError(404, "That idea doesn't exist.");
+    const job = startJob("arch", { folder, text: "" }, async ({ log }) => {
+      await pullIfRemote(cfg.repoPath, log);
+      await fs.writeFile(path.join(cfg.repoPath, folder, ARCH_FILE), text.replace(/\r\n/g, "\n").trimEnd() + "\n", "utf8");
+      log(`Saved ${folder}/${ARCH_FILE}`);
+      const g = await commitAndPush(cfg.repoPath, [folder], `Edit architecture: ${folder}`, { push: cfg.push, log });
+      if (g.committed) await chats.append(folder, [{ role: "note", text: "You edited the architecture diagram.", at: now() }]);
+      return { folder, ...g };
+    });
+    return send(res, 202, { jobId: job.id });
+  }
+
+  if (req.method === "GET" && p === "/vendor/mermaid.min.js") {
+    const data = await fs.readFile(MERMAID_JS).catch(() => null);
+    if (!data) throw httpError(404, "Mermaid isn't installed; run npm install.");
+    res.writeHead(200, { "content-type": "text/javascript", "cache-control": "max-age=86400" });
+    return res.end(data);
   }
 
   if (req.method === "POST" && p === "/api/import") {

@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { git } from "../lib/git.mjs";
-import { rulesBlock, blockedCommand } from "../lib/generate.mjs";
+import { rulesBlock, blockedCommand, parseQuestions } from "../lib/generate.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const real = process.argv.includes("--real");
@@ -210,6 +210,42 @@ try {
   const projPage = await fetch(`http://localhost:${PREVIEW}/${viteIdea}/README.md`);
   ok(projPage.ok && /Vite App/.test(await projPage.text()), "the project's own files are still served from its clone");
   ok(!(await must(viteBare, ["ls-tree", "-r", "--name-only", "main"])).includes("demo.html"), "the demo is not added to the project's repo");
+
+  // --- design questions before building, then build with the answers and the (edited) planned diagram
+  ok((await api("POST", "/api/config", { askQuestions: "new" })).askQuestions === "new", "the questions setting is saved");
+  const pq = parseQuestions('Here you go:\n```json\n{"questions":[{"question":"Colour?","options":["Red","Blue"],"multiple":false},{"question":""}],"diagram":"```mermaid\\nflowchart LR\\n A-->B\\n```","note":"Two things."}\n```');
+  ok(pq.questions.length === 1 && pq.questions[0].options.length === 2 && pq.diagram === "flowchart LR\n A-->B", "Claude's questions are parsed and cleaned");
+  ok(parseQuestions("no json here").questions.length === 0, "a reply without JSON gives no questions instead of crashing");
+  job = await waitJob((await api("POST", "/api/questions", { message: "A habit tracker with streaks" })).jobId);
+  ok(job.state === "done" && job.result.questions.length === 2 && job.result.diagram.includes("flowchart"), "questions step returns questions and a planned diagram");
+  const beforeQ = await must(remote, ["rev-parse", "main"]);
+  ok(beforeQ === (await must(remote, ["rev-parse", "main"])), "asking questions doesn't commit anything");
+  const plan = "flowchart LR\n  User --> Page --> Streaks[(localStorage)]";
+  job = await waitJob((await api("POST", "/api/chat", { message: "A habit tracker with streaks", answers: [{ question: "Who is it mainly for?", answer: "Just me" }, { question: "", answer: "dropped" }], plan })).jobId);
+  printLog(job);
+  ok(job.state === "done" && job.log.some((l) => /Design answers: 1$/.test(l)), "the build got the answers (empty ones dropped)");
+  const habit = job.result.folder;
+  const archText = await must(remote, ["show", `main:${habit}/ARCHITECTURE.md`]);
+  ok(archText.includes("Streaks[(localStorage)]"), "the approved diagram was written to ARCHITECTURE.md");
+  chat = await api("GET", `/api/chat/${habit}`);
+  ok(chat.messages[0].answers?.length === 1 && chat.messages[0].plan === true, "the chat keeps the answers with the message");
+  ideas = await api("GET", "/api/ideas");
+  ok(ideas.find((i) => i.folder === habit)?.hasArch === true, "the idea is listed as having an architecture");
+  const archApi = await api("GET", `/api/ideas/${habit}/readme?which=arch`);
+  ok(archApi.text.includes("```mermaid"), "the panel can load ARCHITECTURE.md");
+
+  // --- the user edits the diagram by hand
+  const edited = "# Architecture\n\n```mermaid\nflowchart LR\n  User --> Page --> API[Sync API] --> DB[(Postgres)]\n```\n";
+  job = await waitJob((await api("POST", `/api/ideas/${habit}/architecture`, { content: edited })).jobId);
+  ok(job.state === "done" && job.result.pushed, "a hand-edited diagram is committed and pushed");
+  ok((await must(remote, ["log", "-1", "--format=%s", "main"])) === `Edit architecture: ${habit}`, "the edit has its own commit");
+  ok((await must(remote, ["show", `main:${habit}/ARCHITECTURE.md`])).includes("Postgres"), "the remote has the user's version");
+  chat = await api("GET", `/api/chat/${habit}`);
+  ok(chat.messages.at(-1).role === "note" && /edited the architecture/i.test(chat.messages.at(-1).text), "the chat notes the edit, so Claude sees it");
+  const emptyEdit = await fetch(`${base}/api/ideas/${habit}/architecture`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: "  " }) });
+  ok(emptyEdit.status === 400, "an empty diagram is refused");
+  const mm = await fetch(`${base}/vendor/mermaid.min.js`);
+  ok(mm.ok && Number(mm.headers.get("content-length") || (await mm.arrayBuffer()).byteLength) > 100000, "the diagram library is served locally");
 
   // --- save an idea without building it
   job = await waitJob((await api("POST", "/api/chat", { message: "A mug that tells you when your coffee is drinkable", saveOnly: true })).jobId);
