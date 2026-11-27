@@ -76,6 +76,7 @@ That runs the whole flow (cook, follow-up, import, change status, with a push af
 - [x] Linked repos that need a build step get a dummy-data demo.html in the preview
 - [x] Design questions before building (with a planned architecture you can edit)
 - [x] Architecture diagrams (Mermaid, in ARCHITECTURE.md) that you can view and edit in the panel
+- [x] UI sketch tab: lay out the UI with labelled, numbered figures, get feedback from Claude, then build from it
 - [ ] Show in the page whether Claude Code is logged in, before you cook
 - [ ] Stream Claude's reply word by word instead of showing it when it's done
 - [ ] Publish the prototypes with GitHub Pages and link them from the list

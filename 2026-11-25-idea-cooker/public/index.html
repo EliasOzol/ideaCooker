@@ -308,6 +308,7 @@
       <p class="error-line hidden" id="chatError" role="alert"></p>
       <div class="composer-foot">
         <label class="save-only hidden" id="saveOnlyBox" title="Claude writes the README with a 🔴 status and no prototype. You can ask it to build one later."><input type="checkbox" id="saveOnly"> Just save the idea, build it later</label>
+        <button class="btn ghost small hidden" type="button" id="sketchFirstBtn" title="Save the idea without building it and open the Sketch tab to lay out the UI first">Sketch it first</button>
         <p class="hint" id="hint">Enter to send · Shift+Enter for a new line</p>
       </div>
     </div>
@@ -319,6 +320,7 @@
       <div class="tabs" role="tablist">
         <button role="tab" id="tabProto" aria-selected="true" type="button">Prototype</button>
         <button role="tab" id="tabReadme" aria-selected="false" type="button">README</button>
+        <button role="tab" id="tabSketch" aria-selected="false" type="button" title="Sketch the UI with labelled figures and get feedback before building">Sketch</button>
         <button role="tab" id="tabArch" aria-selected="false" type="button" title="Architecture diagrams you can view and edit">Architecture</button>
         <button role="tab" id="tabCode" aria-selected="false" type="button" class="hidden" title="The linked repo's own README">Code</button>
       </div>
@@ -443,6 +445,7 @@
   </form>
 </dialog>
 
+<script src="/sketch.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const LABELS = { red: "Idea", yellow: "Prototype", green: "Done" };
@@ -670,7 +673,7 @@ function pendingHtml(p) {
     steps = `<ul class="steps">${labels.map(([k, l]) => `<li class="${s[k]}"><span class="ind"></span>${l}</li>`).join("")}</ul>`;
   }
   const chips = tools.length ? `<div class="tools">${[...new Set(tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
-  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…", remove: "Removing…", questions: "Claude is reading up and preparing questions…", arch: "Saving the diagram…" }[p.kind] || (p.saveOnly ? "Saving your idea…" : "Cooking your idea…");
+  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…", remove: "Removing…", questions: "Claude is reading up and preparing questions…", arch: "Saving the diagram…", sketch: "Saving the sketch…", review: "Claude is looking at your sketch…" }[p.kind] || (p.saveOnly ? "Saving your idea…" : "Cooking your idea…");
   return `${p.userText ? `<div class="msg user">${esc(p.userText)}</div>` : ""}
     <div class="msg assistant"><div class="working"><span class="spinner"></span>${label}</div>${steps}${chips}</div>`;
 }
@@ -694,6 +697,7 @@ function renderChat() {
   $("chatTitle").textContent = idea ? titleOf(idea) : ({ import: "Import", link: "Link a repo" })[state.pending?.kind] || "New idea";
   $("removeBtn").classList.toggle("hidden", !idea || idea.isApp);
   $("saveOnlyBox").classList.toggle("hidden", !!idea || !ready());
+  $("sketchFirstBtn").classList.toggle("hidden", !!idea || !ready());
   const chip = $("repoChip");
   chip.classList.toggle("hidden", !idea?.repo);
   if (idea?.repo) {
@@ -762,6 +766,7 @@ function renderPanel() {
   if (!open) {
     // Closing unloads the prototype, like closing a window.
     const body = $("panelBody");
+    dropSketch();
     body.innerHTML = "";
     delete body.dataset.readme;
     return;
@@ -774,7 +779,8 @@ function renderPanel() {
   $("tabProto").disabled = !hasProto;
   $("tabProto").title = hasProto ? "" : idea.repo ? "This project needs a build step, so it can't be previewed here" : "No web page to preview";
   $("tabCode").classList.toggle("hidden", !hasCode);
-  for (const [id, t] of [["tabProto", "proto"], ["tabReadme", "readme"], ["tabArch", "arch"], ["tabCode", "code"]]) $(id).setAttribute("aria-selected", String(state.tab === t));
+  for (const [id, t] of [["tabProto", "proto"], ["tabReadme", "readme"], ["tabSketch", "sketch"], ["tabArch", "arch"], ["tabCode", "code"]]) $(id).setAttribute("aria-selected", String(state.tab === t));
+  if (state.tab !== "sketch") dropSketch();
 
   const sel = $("statusSel");
   sel.innerHTML = (idea.status ? "" : `<option value="">No status</option>`) + Object.entries(LABELS).map(([k, l]) => `<option value="${k}"${idea.status === k ? " selected" : ""}>${l}</option>`).join("");
@@ -792,6 +798,9 @@ function renderPanel() {
       body.innerHTML = `<iframe title="Prototype of ${esc(titleOf(idea))}" data-src="${esc(src)}" src="${esc(src)}"></iframe>`;
     }
     $("openTab").href = src;
+  } else if (state.tab === "sketch") {
+    $("openTab").href = `${base}SKETCH.png`;
+    return renderSketch(idea, body);
   } else if (state.tab === "arch") {
     $("openTab").href = `${base}ARCHITECTURE.md`;
     return renderArch(idea, body);
@@ -899,6 +908,113 @@ async function saveArch() {
   renderAll();
 }
 
+/* ---------- UI sketch tab: labelled figures, feedback from Claude, then build ---------- */
+const REVIEW_REQUEST = "Look at my UI sketch and tell me what's unclear, missing or could go wrong before you build it.";
+const SKETCH_BUILD_REQUEST = "Build the prototype from my UI sketch: follow its layout and each figure's description.";
+
+function dropSketch() {
+  if (!state.sketch) return;
+  state.sketch.editor?.destroy();
+  state.sketch = null;
+  delete $("panelBody").dataset.readme;
+}
+
+function renderSketch(idea, body) {
+  if (state.sketch?.folder === idea.folder && body.dataset.readme === `sketch:${idea.folder}`) {
+    syncSketchButtons();
+    return;
+  }
+  dropSketch();
+  const key = `sketch:${idea.folder}`;
+  body.dataset.readme = key;
+  body.innerHTML = `<div class="panel-empty">Loading the sketch…</div>`;
+  const token = (state.sketchToken = (state.sketchToken || 0) + 1);
+  const load = idea.hasSketch ? api("GET", `/api/ideas/${encodeURIComponent(idea.folder)}/sketch`).then((r) => r.sketch).catch(() => null) : Promise.resolve(null);
+  load.then((sketch) => {
+    if (token !== state.sketchToken || body.dataset.readme !== key || state.tab !== "sketch") return;
+    const editor = window.SketchEditor.mount(body, sketch, { onDirty: () => syncSketchButtons() });
+    state.sketch = { folder: idea.folder, editor };
+    editor.actions.innerHTML = `
+      <button class="btn" type="button" id="skSave">Save</button>
+      <button class="btn" type="button" id="skReview" title="Claude looks at the sketch and replies in the chat; nothing is built">Ask for feedback</button>
+      <button class="btn primary" type="button" id="skBuild">Build from sketch</button>`;
+    $("skSave").addEventListener("click", () => saveSketch());
+    $("skReview").addEventListener("click", reviewSketchNow);
+    $("skBuild").addEventListener("click", buildFromSketch);
+    syncSketchButtons();
+  });
+}
+
+function syncSketchButtons() {
+  const sk = state.sketch;
+  if (!sk || !$("skSave")) return;
+  const empty = !sk.editor.count();
+  $("skSave").disabled = !!state.pending || !sk.editor.isDirty() || empty;
+  $("skSave").textContent = sk.editor.isDirty() ? "Save" : "Saved";
+  $("skReview").disabled = $("skBuild").disabled = !!state.pending || empty;
+}
+
+/* Save the sketch (JSON + a PNG picture for Claude). Returns true when it's saved. */
+async function saveSketch() {
+  const sk = state.sketch;
+  if (!sk || state.pending) return false;
+  if (!sk.editor.isDirty()) return true;
+  const sketch = sk.editor.get();
+  const png = await sk.editor.png();
+  const job = await runJob("sketch", () => api("POST", `/api/ideas/${encodeURIComponent(sk.folder)}/sketch`, { sketch, png }), "", sk.folder);
+  if (job?.state !== "done") { syncSketchButtons(); return false; }
+  sk.editor.markSaved();
+  await loadChat();
+  renderSidebar();
+  renderChat();
+  syncSketchButtons();
+  return true;
+}
+
+async function reviewSketchNow() {
+  if (!(await saveSketch())) return;
+  setMax(false); // the reply arrives in the chat, so make sure it's visible
+  const folder = state.folder;
+  const job = await runJob("review", () => api("POST", "/api/chat", { folder, message: REVIEW_REQUEST, mode: "review" }), REVIEW_REQUEST, folder);
+  if (state.folder === folder) await loadChat();
+  renderSidebar();
+  renderChat();
+  syncSketchButtons();
+  return job;
+}
+
+async function buildFromSketch() {
+  if (!(await saveSketch())) return;
+  $("input").value = SKETCH_BUILD_REQUEST;
+  send(true);
+}
+
+function leaveSketch() {
+  const sk = state.sketch;
+  if (!sk || !sk.editor.isDirty()) return true;
+  return confirm("You have unsaved changes in the sketch. Leave without saving?");
+}
+function leaveEditors() { return leaveSketch() && leaveArchEdit(); }
+
+/* New idea: save it without building, then open the Sketch tab to lay out the UI first. */
+async function sketchFirst() {
+  const text = $("input").value.trim();
+  if (!text) { $("input").placeholder = "Describe the idea first, then click Sketch it first…"; $("input").focus(); return; }
+  if (state.pending || !ready()) return;
+  $("input").value = "";
+  autosize();
+  const job = await runJob("cook", () => api("POST", "/api/chat", { message: text, saveOnly: true }), text, null, { saveOnly: true });
+  if (job?.state === "done") {
+    await select(job.result.folder);
+    state.tab = "sketch";
+    setPanel(true);
+    return;
+  }
+  $("input").value = text;
+  autosize();
+  renderAll();
+}
+
 /* Leaving the editor with unsaved changes asks first. Returns false to stay. */
 function leaveArchEdit() {
   const ed = state.archEdit;
@@ -916,7 +1032,7 @@ function renderAll() {
 
 /* ---------- navigation ---------- */
 async function select(folder) {
-  if ((folder || null) !== state.folder && !leaveArchEdit()) {
+  if ((folder || null) !== state.folder && !leaveEditors()) {
     history.replaceState(null, "", state.folder ? `#/${state.folder}` : "#/");
     return;
   }
@@ -967,7 +1083,7 @@ async function follow(jobId, kind, userText, folder, extra = {}) {
   await loadIdeas();
   if (job.state === "done") {
     state.previewVersion = Date.now();
-    if (!["status", "questions", "arch", "remove"].includes(kind)) state.panelOpen = true; // show what changed, like a chat app opening its canvas
+    if (!["status", "questions", "arch", "remove", "sketch", "review"].includes(kind)) state.panelOpen = true; // show what changed, like a chat app opening its canvas
   } else showError(job.error || "Something went wrong.");
   return job;
 }
@@ -1181,7 +1297,7 @@ $("newBtn").addEventListener("click", () => select(null));
 $("openDrawer").addEventListener("click", () => $("app").classList.add("drawer"));
 $("closeDrawer").addEventListener("click", () => $("app").classList.remove("drawer"));
 $("showPanel").addEventListener("click", () => setPanel(true));
-$("hidePanel").addEventListener("click", () => { setMax(false); setPanel(false); });
+$("hidePanel").addEventListener("click", () => { if (!leaveEditors()) return; setMax(false); setPanel(false); });
 
 /* resizable preview: drag the left edge, arrow keys, double-click to reset; width is remembered */
 const PANEL_KEY = "ideaCooker.panelWidth";
@@ -1249,10 +1365,13 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || !state.panelOpen || !current() || document.querySelector("dialog[open]")) return;
   // Esc first leaves the maximized view, then closes the panel.
   if ($("app").classList.contains("panel-max")) setMax(false);
-  else setPanel(false);
+  else if (leaveEditors()) setPanel(false);
 });
 
-const goTab = (t) => { if (state.tab !== t && !leaveArchEdit()) return; state.tab = t; renderPanel(); };
+const goTab = (t) => { if (state.tab !== t && !leaveEditors()) return; state.tab = t; renderPanel(); };
+$("tabSketch").addEventListener("click", () => goTab("sketch"));
+$("sketchFirstBtn").addEventListener("click", sketchFirst);
+window.addEventListener("beforeunload", (e) => { if (state.sketch?.editor.isDirty() || state.archEdit?.dirty) { e.preventDefault(); e.returnValue = ""; } });
 $("tabProto").addEventListener("click", () => goTab("proto"));
 $("tabReadme").addEventListener("click", () => goTab("readme"));
 $("tabArch").addEventListener("click", () => goTab("arch"));

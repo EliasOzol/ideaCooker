@@ -28,6 +28,9 @@ const CHECKS_SHELL = `Check your change by running it: run the project's tests (
 /** When and how Claude draws the architecture, and how it treats a diagram the user edited. */
 const archRule = (archPath) => `If the prototype has several parts (more than one file with logic, a server, a browser extension, external APIs, or data moving between components), write \`${archPath}\`: a short note plus one to three Mermaid diagrams in \`\`\`mermaid blocks (a flowchart or component diagram of the parts, and a class or sequence diagram where it helps). Keep labels short and the diagrams valid Mermaid. If \`${archPath}\` already exists, the user may have edited it by hand: treat it as the agreed design and build to match it; if the request needs a different design, update the diagram and say what changed. A single simple page doesn't need one unless the user asks.`;
 
+/** The user's UI sketch: the agreed layout. Claude reads it (JSON + picture) and never edits it. */
+const sketchRule = (dir) => `If \`${dir}/SKETCH.json\` exists, it's the user's UI sketch: numbered figures, each with a kind (button, input, dropdown, image, …), a label shown inside it, a description of what it is and does, and its position and size in the frame. \`${dir}/SKETCH.png\` is a picture of it; open it with Read to see the layout. Treat the sketch as the agreed layout: build the UI to match its structure, order and descriptions, and refer to figures by number (#3). If something in it can't work, say so instead of silently changing it. Don't edit the sketch files; the user owns them.`;
+
 /** The user's answers to the pre-build questions, and the planned diagram they approved (and maybe edited). */
 function designBlock(design, archPath) {
   if (!design || (!design.answers?.length && !design.plan)) return "";
@@ -326,6 +329,7 @@ Rules:
 - If the change affects what the idea notes say (what works, status, next steps), update \`${ideaDir}${path.sep}README.md\` too. Keep its format. ${STATUS_RULE}
 ${demoRule}
 - ${archRule(path.join(ideaDir, "ARCHITECTURE.md"))} (It describes the project, and lives in the ideas repository, not in the project.)
+- ${sketchRule(ideaDir)}
 - Don't change anything else in the ideas repository.
 - If the request is only a question, answer it and don't change files.
 - ${RULES} The app commits your changes to ${cloneLabel} and pushes them.${designBlock(design, path.join(ideaDir, "ARCHITECTURE.md"))}
@@ -344,6 +348,7 @@ Make the change. Rules:
 - Only create or edit files inside \`${folder}/\`. Other folders are other ideas; don't touch them.
 - Keep \`${folder}/README.md\` accurate. When the change affects them, update "The prototype", "Run it", "Status" and "Next steps" (tick off done items). Keep its format. ${STATUS_RULE}
 - ${archRule(`${folder}/ARCHITECTURE.md`)}
+- ${sketchRule(folder)}
 - If the request is only a question, answer it and don't change files.
 - ${RULES}${designBlock(design, `${folder}/ARCHITECTURE.md`)}
 
@@ -380,7 +385,7 @@ Their request:
 ${message}
 </request>
 
-${folder ? "Read the relevant files first (README, the prototype, ARCHITECTURE.md if there is one) so you only ask what isn't already decided. " : ""}Don't write or change any files in this step.
+${folder ? "Read the relevant files first (README, the prototype, ARCHITECTURE.md, and the UI sketch SKETCH.json with its picture SKETCH.png if they exist) so you only ask what isn't already decided. " : ""}Don't write or change any files in this step.
 
 Then reply with ONLY a JSON object in a \`\`\`json code block, shaped like this:
 {"questions": [{"question": "…", "options": ["…", "…"], "multiple": false}], "diagram": "", "note": "…"}
@@ -391,6 +396,34 @@ Then reply with ONLY a JSON object in a \`\`\`json code block, shaped like this:
 - note: one short sentence to show above the questions.`;
   const r = await runClaude({ root, prompt, scope: { type: "folder", folder: folder || "", clone, cloneLabel, readOnly: true }, model, rules, allowCommands: false, log, emit: () => {} });
   return parseQuestions(r.reply);
+}
+
+/**
+ * Feedback on the user's UI sketch before anything is built. Read-only; the reply goes into the chat,
+ * and the chat session continues, so the user can answer and ask again.
+ */
+export async function reviewSketch({ repoPath, folder, message, sessionId, clone = null, cloneLabel = "", model, rules = [], log, emit = () => {} }) {
+  const root = path.resolve(repoPath);
+  if (FAKE()) {
+    log("[fake mode] sketch review");
+    const s = JSON.parse(await fs.readFile(path.join(root, folder, "SKETCH.json"), "utf8").catch(() => '{"shapes":[]}'));
+    return { folder, sessionId: `fake-${folder}`, reply: `[fake] I see ${s.shapes.length} figures. #1 needs a description.` };
+  }
+  const dir = path.join(root, folder);
+  const prompt = `The user has sketched the UI for their idea${clone ? ` (the linked project ${cloneLabel}; its code is in your working directory)` : ""} and wants your feedback before anything is built. The sketch is \`${path.join(dir, "SKETCH.json")}\` (numbered figures with a kind, a label shown inside, a description, and position and size in the frame) and \`${path.join(dir, "SKETCH.png")}\` is a picture of it. Read both, and the idea's README in \`${dir}\` for context.
+
+What the user asks:
+<request>
+${message}
+</request>
+
+Reply in the chat, concisely, with:
+1. How you understand the UI, in two or three sentences, referring to figures by number (#2).
+2. Problems you see: descriptions that are unclear or could mean two things, missing pieces (empty, loading and error states, how you get back, what happens after a click), layout or flow issues, usability and accessibility concerns, and anything that conflicts with the user's rule sets. Only real problems, most important first.
+3. Questions whose answers would change what you build.
+
+Don't build anything and don't change any files: the user will update the sketch or answer you, and build when they're ready.`;
+  return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, readOnly: true }, resume: sessionId, model, rules, allowCommands: false, log, emit });
 }
 
 /** Pull the JSON out of Claude's reply and keep only well-formed questions. */

@@ -247,6 +247,33 @@ try {
   const mm = await fetch(`${base}/vendor/mermaid.min.js`);
   ok(mm.ok && Number(mm.headers.get("content-length") || (await mm.arrayBuffer()).byteLength) > 100000, "the diagram library is served locally");
 
+  // --- UI sketch: save it, get feedback (nothing built), and it's there for the build
+  const noSketch = await fetch(`${base}/api/ideas/${habit}/sketch`);
+  ok(noSketch.status === 404, "an idea without a sketch says so");
+  const png1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const sketch = { frame: { preset: "phone" }, shapes: [
+    { id: "a", n: 1, kind: "input", x: 16, y: 80, w: 358, h: 48, label: "Add a habit", desc: "Type a habit and press Enter to add it to the list." },
+    { id: "b", n: 2, kind: "list", x: 16, y: 144, w: 358, h: 400, label: "Today", desc: "Habits for today; tap one to tick it off." },
+    { id: "c", n: 3, kind: "spaceship", x: 16, y: 560, w: 160, h: 48, label: "Streak", desc: "" },
+  ] };
+  const badSketch = await fetch(`${base}/api/ideas/${habit}/sketch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sketch: { shapes: [] } }) });
+  ok(badSketch.status === 400, "an empty sketch is refused");
+  job = await waitJob((await api("POST", `/api/ideas/${habit}/sketch`, { sketch, png: png1x1 })).jobId);
+  ok(job.state === "done" && job.result.pushed, "the sketch is committed and pushed");
+  const sketchTree = await must(remote, ["ls-tree", "-r", "--name-only", "main", habit]);
+  ok(sketchTree.includes(`${habit}/SKETCH.json`) && sketchTree.includes(`${habit}/SKETCH.png`), "SKETCH.json and SKETCH.png are in the repo");
+  const back = (await api("GET", `/api/ideas/${habit}/sketch`)).sketch;
+  ok(back.frame.w === 390 && back.shapes.length === 3 && back.shapes[2].kind === "other", "the sketch comes back cleaned (phone frame, unknown kind becomes 'other')");
+  ideas = await api("GET", "/api/ideas");
+  ok(ideas.find((i) => i.folder === habit)?.hasSketch === true, "the idea is listed as having a sketch");
+  const beforeReview = await must(remote, ["rev-parse", "main"]);
+  job = await waitJob((await api("POST", "/api/chat", { folder: habit, message: "Look at my sketch", mode: "review" })).jobId);
+  ok(job.state === "done" && /3 figures/.test(job.result.reply), `sketch feedback came back (${job.error || job.result.reply})`);
+  ok((await must(remote, ["rev-parse", "main"])) === beforeReview, "feedback doesn't commit anything");
+  chat = await api("GET", `/api/chat/${habit}`);
+  ok(chat.messages.some((mm) => mm.role === "note" && /UI sketch \(3 figures\)/.test(mm.text)) && chat.messages.at(-1).role === "assistant", "the chat has the sketch note and Claude's feedback");
+  ok((await fetch(`${base}/sketch.js`)).ok, "the sketch editor is served");
+
   // --- save an idea without building it
   job = await waitJob((await api("POST", "/api/chat", { message: "A mug that tells you when your coffee is drinkable", saveOnly: true })).jobId);
   printLog(job);

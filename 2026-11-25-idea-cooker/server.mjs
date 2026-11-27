@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { inspectRepo, pullIfRemote, commitAndPush } from "./lib/git.mjs";
 import { listIdeas, updateIdeaStatus, STATUSES } from "./lib/ideas.mjs";
-import { cookIdea, reviseIdea, describeImport, describeLinked, askQuestions, today } from "./lib/generate.mjs";
+import { cookIdea, reviseIdea, describeImport, describeLinked, askQuestions, reviewSketch, today } from "./lib/generate.mjs";
+import { cleanSketch, sketchPngBuffer } from "./lib/sketch.mjs";
 import { importIntoRepo, kebab } from "./lib/importer.mjs";
 import { chatStore } from "./lib/chats.mjs";
 import { parseRepoUrl, readLink, writeLink, ensureClone, cloneDir, firstCommitDate, commitClone, staticEntry } from "./lib/linked.mjs";
@@ -22,6 +23,8 @@ const REPOS_DIR = process.env.IDEA_COOKER_REPOS || path.join(here, "repos");
 const FOLDER_RE = /^\d{4}-\d{2}-\d{2}-[\w.-]+$/;
 const DEMO_FILE = "demo.html"; // dummy-data demo for linked repos that can't be previewed as they are
 const ARCH_FILE = "ARCHITECTURE.md"; // Mermaid diagrams of the idea's design; Claude and the user both edit it
+const SKETCH_FILE = "SKETCH.json"; // the user's UI wireframe: numbered figures with labels and descriptions
+const SKETCH_PNG = "SKETCH.png"; // a picture of it, so Claude can see the layout too
 const MERMAID_JS = path.join(here, "node_modules", "mermaid", "dist", "mermaid.min.js");
 
 // ---------- config ----------
@@ -105,11 +108,11 @@ function send(res, status, body, type = "application/json; charset=utf-8") {
   res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
   res.end(type.startsWith("application/json") ? JSON.stringify(body) : body);
 }
-async function readJson(req) {
+async function readJson(req, limit = 100_000) {
   let raw = "";
   for await (const c of req) {
     raw += c;
-    if (raw.length > 100_000) throw httpError(413, "Body too large");
+    if (raw.length > limit) throw httpError(413, "Body too large");
   }
   try {
     return raw ? JSON.parse(raw) : {};
@@ -145,6 +148,7 @@ async function handle(req, res) {
   }
 
   if (req.method === "GET" && (p === "/" || p === "/index.html")) return serveFile(res, PUBLIC_DIR, "index.html");
+  if (req.method === "GET" && p === "/sketch.js") return serveFile(res, PUBLIC_DIR, "sketch.js");
 
   if (req.method === "GET" && p === "/api/config") {
     const cfg = await loadConfig();
@@ -191,6 +195,7 @@ async function handle(req, res) {
       i.hasChat = await chats.has(i.folder);
       i.isApp = i.folder === appFolder;
       i.hasArch = i.files.includes(ARCH_FILE);
+      i.hasSketch = i.files.includes(SKETCH_FILE);
       const link = await readLink(cfg.repoPath, i.folder);
       if (link) {
         const repo = parseRepoUrl(link.repo);
@@ -275,7 +280,7 @@ async function handle(req, res) {
   // One endpoint for the chat box: no folder = cook a new idea, a folder = change that idea.
   if (req.method === "POST" && p === "/api/chat") {
     const cfg = await requireRepo();
-    const { folder, message, saveOnly, answers, plan } = await readJson(req);
+    const { folder, message, saveOnly, answers, plan, mode } = await readJson(req);
     const text = String(message || "").trim();
     if (!text) throw httpError(400, "Write a message first.");
     const design = cleanDesign(answers, plan);
@@ -300,6 +305,21 @@ async function handle(req, res) {
     checkFolder(folder);
     const exists = await fs.stat(path.join(cfg.repoPath, folder)).catch(() => null);
     if (!exists?.isDirectory()) throw httpError(404, "That idea doesn't exist.");
+
+    // Feedback on the UI sketch: Claude only reads and answers in the chat; nothing is built or committed.
+    if (mode === "review") {
+      const job = startJob("review", { folder, text }, async ({ log, emit, job }) => {
+        const chat = await chats.get(folder);
+        const link = await readLink(cfg.repoPath, folder);
+        const repo = link ? parseRepoUrl(link.repo) : null;
+        const clone = repo ? await ensureClone(REPOS_DIR, repo, log) : null;
+        const r = await reviewSketch({ repoPath: cfg.repoPath, folder, message: text, sessionId: chat.sessionId, clone, cloneLabel: repo?.label, model: cfg.model, rules: activeRules(cfg), log, emit });
+        await chats.append(folder, [userMsg(), { role: "assistant", text: r.reply, tools: toolsOf(job), at: now() }], r.sessionId);
+        return { folder, reply: r.reply };
+      });
+      return send(res, 202, { jobId: job.id });
+    }
+
     const job = startJob("revise", { folder, text }, async ({ log, emit, job }) => {
       try {
         await pullIfRemote(cfg.repoPath, log);
@@ -364,6 +384,35 @@ async function handle(req, res) {
       return { folder, ...g };
     });
     return send(res, 202, { jobId: job.id });
+  }
+
+  // The UI sketch: load it, or save the user's version (JSON + a PNG picture), commit, push, note it in the chat.
+  if ((m = p.match(/^\/api\/ideas\/([\w.-]+)\/sketch$/))) {
+    const cfg = await requireRepo();
+    const folder = checkFolder(m[1]);
+    const dir = path.join(cfg.repoPath, folder);
+    if (!(await fs.stat(dir).catch(() => null))?.isDirectory()) throw httpError(404, "That idea doesn't exist.");
+    if (req.method === "GET") {
+      const text = await fs.readFile(path.join(dir, SKETCH_FILE), "utf8").catch(() => null);
+      if (text === null) throw httpError(404, "No sketch yet");
+      return send(res, 200, { sketch: JSON.parse(text) });
+    }
+    if (req.method === "POST") {
+      const body = await readJson(req, 4_000_000);
+      const sketch = cleanSketch(body.sketch);
+      if (!sketch.shapes.length) throw httpError(400, "The sketch is empty.");
+      const png = sketchPngBuffer(body.png);
+      const job = startJob("sketch", { folder, text: "" }, async ({ log }) => {
+        await pullIfRemote(cfg.repoPath, log);
+        await fs.writeFile(path.join(dir, SKETCH_FILE), JSON.stringify(sketch, null, 2) + "\n", "utf8");
+        if (png) await fs.writeFile(path.join(dir, SKETCH_PNG), png);
+        log(`Saved ${folder}/${SKETCH_FILE}${png ? ` and ${SKETCH_PNG}` : ""}`);
+        const g = await commitAndPush(cfg.repoPath, [folder], `Update UI sketch: ${folder}`, { push: cfg.push, log });
+        if (g.committed) await chats.append(folder, [{ role: "note", text: `You updated the UI sketch (${sketch.shapes.length} figures).`, at: now() }]);
+        return { folder, ...g };
+      });
+      return send(res, 202, { jobId: job.id });
+    }
   }
 
   if (req.method === "GET" && p === "/vendor/mermaid.min.js") {
