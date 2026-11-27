@@ -5,13 +5,13 @@ import { pathToFileURL } from "node:url";
 /** Idea Cooker's modules, loaded from its folder so its node_modules (the Claude SDK) resolve there. */
 export async function loadCooker(cookerDir) {
   const lib = (f) => import(pathToFileURL(path.join(cookerDir, "lib", f)).href);
-  const [generate, git] = await Promise.all([lib("generate.mjs"), lib("git.mjs")]);
+  const [generate, git, ideas, chats, sketch] = await Promise.all(["generate.mjs", "git.mjs", "ideas.mjs", "chats.mjs", "sketch.mjs"].map(lib));
   let sdk = null;
   const getSdk = async () =>
     (sdk ??= await import(pathToFileURL(path.join(cookerDir, "node_modules", "@anthropic-ai", "claude-agent-sdk", "sdk.mjs")).href).catch(() => {
       throw new Error(`Claude SDK not found. Run npm install in ${path.basename(cookerDir)} first.`);
     }));
-  return { generate, git, getSdk };
+  return { dir: cookerDir, generate, git, ideas, chats, sketch, getSdk };
 }
 
 const FAKE = () => process.env.IDEA_COOKER_FAKE === "1";
@@ -29,6 +29,11 @@ export function readReadme(text) {
 
 /** Ideas repo brick: Idea Cooker writes `<date>-<slug>/README.md`, then that folder is committed (never pushed). */
 async function repoBrick({ ctx, brick, env, log }) {
+  // An idea cooked on the Cooker page arrives with its folder already written and committed.
+  if (ctx.folder) {
+    ctx.readme = await fs.readFile(path.join(env.repoPath, ctx.folder, "README.md"), "utf8");
+    return { detail: `Used the cooked idea ${ctx.folder}` };
+  }
   const r = await env.cooker.generate.cookIdea({
     repoPath: env.repoPath, idea: ctx.prompt, saveOnly: true, model: env.model, rules: env.rules, log,
   });
@@ -139,7 +144,7 @@ async function websiteBrick({ ctx, env }) {
     `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ideas</title><style>${PAGE_CSS}</style>
 <main><h1>Ideas</h1><p class="lede">One idea a day, from the IdeaMesh.</p><ul>${rows}</ul></main></html>\n`,
   );
-  return { detail: `Wrote site/${ctx.folder}/index.html`, link: `/site/${encodeURIComponent(ctx.folder)}/` };
+  return { detail: `Wrote site/${ctx.folder}/index.html` };
 }
 
 export const BRICKS = { repo: repoBrick, portfolio: portfolioBrick, website: websiteBrick };

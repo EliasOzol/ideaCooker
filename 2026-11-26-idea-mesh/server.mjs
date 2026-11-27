@@ -1,25 +1,31 @@
 import http from "node:http";
 import fs from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { store, patchBrick, runOrder, skipReason, SETTING_OPTIONS } from "./lib/store.mjs";
 import { loadCooker } from "./lib/bricks.mjs";
 import { engine } from "./lib/engine.mjs";
+import { cookerApi } from "./lib/cooker.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-const TYPES = { ".html": "text/html; charset=utf-8", ".json": "application/json; charset=utf-8", ".css": "text/css", ".js": "text/javascript" };
+const TYPES = {
+  ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8", ".json": "application/json; charset=utf-8", ".css": "text/css",
+  ".js": "text/javascript", ".mjs": "text/javascript", ".md": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".svg": "image/svg+xml",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".wav": "audio/wav", ".mp3": "audio/mpeg", ".woff2": "font/woff2",
+};
 
 function send(res, code, body, type = "application/json; charset=utf-8") {
   res.writeHead(code, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff" });
   res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 
-async function readBody(req) {
+async function readBody(req, limit = 100_000) {
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
-    if (raw.length > 100_000) throw Object.assign(new Error("Request too large."), { status: 413 });
+    if (raw.length > limit) throw Object.assign(new Error("Request too large."), { status: 413 });
   }
   try {
     return raw ? JSON.parse(raw) : {};
@@ -43,18 +49,36 @@ export async function startServer({
   cookerDir = process.env.IDEA_COOKER_DIR || path.join(here, "..", "2026-11-25-idea-cooker"),
   dataDir = process.env.IDEA_MESH_DATA || here,
   repoPath = process.env.IDEA_MESH_REPO,
+  chatsDir = process.env.IDEA_MESH_CHATS,
   quiet = false,
 } = {}) {
+  // Settings (repo, model, rule sets, push, commands) come from Idea Cooker's config, read fresh on each use.
   const cfgFile = process.env.IDEA_COOKER_CONFIG || path.join(cookerDir, "config.json");
-  const cfg = JSON.parse(await fs.readFile(cfgFile, "utf8").catch(() => "{}"));
+  const readConfig = () => {
+    try {
+      return JSON.parse(readFileSync(cfgFile, "utf8"));
+    } catch {
+      return {};
+    }
+  };
+  const cfg = readConfig();
   repoPath = path.resolve(repoPath || cfg.repoPath || path.join(here, ".."));
+  const previewPort = port + 1;
   const log = (line) => quiet || console.log(`${new Date().toLocaleTimeString()} ${line}`);
 
   const clients = new Set();
   const env = {
     repoPath,
-    model: cfg.model || "",
-    rules: Array.isArray(cfg.rules) ? cfg.rules : [],
+    config: readConfig,
+    get model() {
+      return readConfig().model || "";
+    },
+    get rules() {
+      return this.activeRules(readConfig());
+    },
+    activeRules: (c) => (Array.isArray(c.rules) ? c.rules.filter((r) => r && r.enabled !== false && r.text) : []),
+    lock: { by: null },
+    previewPort,
     cooker: await loadCooker(cookerDir),
     store: store(dataDir),
     log,
@@ -64,6 +88,7 @@ export async function startServer({
     },
   };
   const eng = engine(env);
+  const cooker = cookerApi(env, { engine: eng, chatsDir: chatsDir || path.join(cookerDir, "chats") });
 
   // A run that was in progress when the server stopped can't continue; mark it so the log is honest.
   const runs = await env.store.runs();
@@ -128,7 +153,15 @@ export async function startServer({
       return item ? send(res, 200, item) : send(res, 404, { error: "This entry is no longer in portfolio.json." });
     }
     if (p.startsWith("/site/")) return serveFile(res, env.store.siteDir, decodeURIComponent(p.slice(6)));
+    if (p.startsWith("/api/cooker/")) {
+      if ((await cooker(req, res, p, url, { send, readBody })) !== false) return;
+      return send(res, 404, { error: "Not found" });
+    }
+    // Idea Cooker's sketch editor and Mermaid, served from its folder so both apps use the same versions.
+    if (p === "/vendor/sketch.js") return serveFile(res, path.join(cookerDir, "public"), "sketch.js");
+    if (p === "/vendor/mermaid.min.js") return serveFile(res, path.join(cookerDir, "node_modules", "mermaid", "dist"), "mermaid.min.js");
     if (p === "/" || p === "/index.html") return serveFile(res, path.join(here, "public"), "index.html");
+    if (p === "/cooker.js") return serveFile(res, path.join(here, "public"), "cooker.js");
     send(res, 404, { error: "Not found" });
   }
 
@@ -138,9 +171,25 @@ export async function startServer({
       if (!res.headersSent) send(res, e.status || 500, { error: e.message });
     }),
   );
-  await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
-  log(`IdeaMesh running on http://localhost:${port} (repo: ${repoPath})`);
-  return { server, port, close: () => new Promise((r) => { for (const c of clients) c.end(); server.close(r); }) };
+  // Prototypes are served read-only from their own port (a different origin), so their scripts can't call the API.
+  const preview = http.createServer((req, res) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, { error: "Read-only" });
+    const m = decodeURIComponent(new URL(req.url, "http://x").pathname).match(/^\/(\d{4}-\d{2}-\d{2}-[\w.-]+)\/(.*)$/);
+    if (!m) return send(res, 404, { error: "Not found" });
+    serveFile(res, path.join(repoPath, m[1]), m[2] || "index.html").catch((e) => send(res, 500, { error: e.message }));
+  });
+  const listen = (srv, p) => new Promise((resolve, reject) => {
+    srv.once("error", (e) => reject(e.code === "EADDRINUSE" ? new Error(`Port ${p} is already in use. Is IdeaMesh already running? Set PORT to use another port.`) : e));
+    srv.listen(p, "127.0.0.1", resolve);
+  });
+  await listen(server, port);
+  await listen(preview, previewPort).catch((e) => { server.close(); throw e; });
+  log(`IdeaMesh running on http://localhost:${port} (repo: ${repoPath}, previews on ${previewPort})`);
+  const close = () => Promise.all([
+    new Promise((r) => { for (const c of clients) c.end(); server.close(r); }),
+    new Promise((r) => preview.close(r)),
+  ]);
+  return { server, port, close };
 }
 
 /** The run as the page sees it: without the README text kept for reruns. */

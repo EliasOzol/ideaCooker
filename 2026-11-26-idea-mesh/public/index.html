@@ -8,14 +8,14 @@
   :root {
     color-scheme: light dark;
     --bg: #f4f1ec; --surface: #fbfaf7; --raised: #ffffff; --ink: #1f1c18; --muted: #6e675e; --faint: #a59d92;
-    --line: #ddd6cb; --line-strong: #8f877c; --accent: #b4472b; --accent-ink: #ffffff; --accent-soft: #f3e2db;
+    --line: #ddd6cb; --line-strong: #8f877c; --accent: #b4472b; --accent-ink: #ffffff; --accent-soft: #f3e2db; --sunk: #ece7df; --ink-2: #4a443d; --ink-3: #8a8277; --amber: #c99a1c;
     --red: #c2412d; --yellow: #c99a1c; --green: #3f8f5a; --focus: #2d6fd6;
     --radius: 8px; --ease: 160ms cubic-bezier(.2,.7,.3,1);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #151412; --surface: #1c1a17; --raised: #24211d; --ink: #ece6dc; --muted: #a59d91; --faint: #6f685f;
-      --line: #34302a; --line-strong: #7b7468; --accent: #e07a5c; --accent-ink: #1a0f0b; --accent-soft: #3a2620;
+      --line: #34302a; --line-strong: #7b7468; --accent: #e07a5c; --accent-ink: #1a0f0b; --accent-soft: #3a2620; --sunk: #121110; --ink-2: #c9c2b7; --ink-3: #7d766c; --amber: #e0b54a;
       --red: #e0664f; --yellow: #e0b54a; --green: #64b27d; --focus: #79a8ff;
     }
   }
@@ -51,6 +51,7 @@
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .btn.primary:hover:not(:disabled) { filter: brightness(1.06); border-color: var(--accent); }
   .run { height: auto; min-height: 56px; width: 136px; font-size: 15px; }
+  .run.cook { width: 152px; font-weight: 600; }
   .run.stopping { background: var(--raised); color: var(--ink); border-color: var(--line-strong); }
 
   /* #4 canvas + #15 inspector */
@@ -151,7 +152,6 @@
 
   .preview { display: grid; gap: 16px; }
   .preview .close { height: 32px; padding: 0 16px; font-weight: 500; }
-  .frame { display: block; width: 100%; height: 360px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); }
   .quiet { justify-self: start; color: var(--muted); font-size: 13px; text-decoration: none; }
   .quiet:hover { color: var(--ink); text-decoration: underline; }
   .entry { display: grid; gap: 8px; }
@@ -194,7 +194,7 @@
 <header class="top">
   <div class="brand">IdeaMesh</div>
   <nav class="tabs" aria-label="Pages">
-    <button class="tab" data-page="cooker">Cooker <small>next</small></button>
+    <button class="tab" data-page="cooker">Cooker</button>
     <button class="tab" data-page="mesh" aria-current="page">Mesh</button>
     <button class="tab" data-page="integration">Integration <small>next</small></button>
   </nav>
@@ -205,6 +205,7 @@
   <form class="prompt-row" id="runForm">
     <label for="prompt" hidden>Today's idea</label>
     <textarea class="prompt" id="prompt" rows="1" placeholder="Describe today's idea…"></textarea>
+    <button type="button" class="btn run cook" id="cookFirst" disabled title="Ask the design questions and cook the idea on the Cooker page first">Cook it first</button>
     <button class="btn primary run" id="run" disabled>Run mesh</button>
   </form>
 
@@ -222,7 +223,7 @@
         <button id="zoomIn" aria-label="Zoom in">+</button>
       </div>
       <div class="canvas-foot">
-        <button class="btn" id="addBrick" disabled title="Adding bricks comes with the Cooker page">Add brick</button>
+        <button class="btn" id="addBrick" disabled title="Adding bricks from the page comes later">Add brick</button>
         <div class="legend">
           <span><i style="border-color:var(--red)"></i>Sketched</span>
           <span><i style="border-color:var(--yellow)"></i>Prototype</span>
@@ -240,6 +241,8 @@
     <p class="empty" id="noRuns">No runs yet. Describe an idea above and press Run mesh.</p>
   </section>
 </main>
+
+<main class="cooker" id="cookerPage" hidden></main>
 
 <main class="soon" id="soonPage" hidden>
   <h1 id="soonTitle"></h1>
@@ -284,15 +287,16 @@ const ago = (iso) => {
   return new Date(iso).toLocaleDateString();
 };
 
-/* ---------- Pages (Cooker and Integration come next) ---------- */
+/* ---------- Pages (Integration comes next) ---------- */
 const SOON = {
-  cooker: ["Cooker comes next", "Cook and sketch a new brick with Idea Cooker's chat, design questions and sketch tab. A brick joins the mesh once its sketch is approved."],
   integration: ["Integration comes next", "Run the whole chain on a test idea and look at what each brick produced, side by side."],
 };
 function showPage(page) {
   document.querySelectorAll(".tab").forEach((t) => t.dataset.page === page ? t.setAttribute("aria-current", "page") : t.removeAttribute("aria-current"));
   $("#meshPage").hidden = page !== "mesh";
-  $("#soonPage").hidden = page === "mesh";
+  $("#cookerPage").hidden = page !== "cooker";
+  $("#soonPage").hidden = !SOON[page];
+  if (page === "cooker") window.Cooker?.show();
   if (SOON[page]) [$("#soonTitle").textContent, $("#soonText").textContent] = SOON[page];
   if (location.hash.slice(1) !== page) history.pushState(null, "", page === "mesh" ? location.pathname : `#${page}`);
 }
@@ -466,7 +470,7 @@ const SETTING_LABELS = { commit: "Commit", tone: "Tone", kind: "Category" };
 const VALUE_LABELS = { true: "Commit locally", false: "Only write files", personal: "Personal", plain: "Plain", technical: "Technical", hobby: "#Hobby project", university: "#University project", "": "None" };
 
 /* ---------- Output preview (replaces the inspector until closed) ---------- */
-let preview = null; // { kind: "portfolio" | "web", folder, link }
+let preview = null; // { kind: "portfolio", folder }
 let shownPreview = "";
 
 function openPreview(p) {
@@ -482,24 +486,21 @@ function closePreview() {
 }
 
 function renderPreview(el) {
-  const key = `${preview.kind}:${preview.folder}:${preview.link}`;
-  if (shownPreview === key && el.querySelector(".preview")) return; // keep the frame from reloading on run updates
+  const key = `${preview.kind}:${preview.folder}`;
+  if (shownPreview === key && el.querySelector(".preview")) return; // don't reload on every run update
   shownPreview = key;
-  const isWeb = preview.kind === "web";
-  const href = isWeb ? preview.link : `/api/portfolio/${encodeURIComponent(preview.folder)}`;
+  const href = `/api/portfolio/${encodeURIComponent(preview.folder)}`;
   el.innerHTML = `
     <div class="preview">
       <div class="head">
-        <div><h2>${isWeb ? "Web page" : "Portfolio entry"}</h2><p>${esc(preview.folder)}</p></div>
+        <div><h2>Portfolio entry</h2><p>${esc(preview.folder)}</p></div>
         <button class="btn close" aria-label="Close preview">Close</button>
       </div>
-      <div class="preview-body">${isWeb
-        ? `<iframe class="frame" src="${esc(href)}" title="Generated web page for ${esc(preview.folder)}" sandbox></iframe>`
-        : `<p class="empty">Loading the entry…</p>`}</div>
+      <div class="preview-body"><p class="empty">Loading the entry…</p></div>
       <a class="quiet" href="${esc(href)}" target="_blank" rel="noopener">Open in new tab</a>
     </div>`;
   el.querySelector(".close").addEventListener("click", closePreview);
-  if (!isWeb) {
+  {
     api(href).then((it) => {
       if (shownPreview !== key) return;
       const kind = { hobby: "#Hobby project", university: "#University project" }[it.kind];
@@ -576,10 +577,10 @@ function renderRuns() {
   $("#noRuns").hidden = state.runs.length > 0;
   list.innerHTML = state.runs.map((r) => {
     const failed = r.steps.filter((s) => s.state === "failed");
-    const links = r.folder ? r.steps.filter((s) => s.link && s.state === "ok").map((s) => {
-      const kind = s.brick === "portfolio" ? "portfolio" : "web";
+    const links = r.folder ? r.steps.filter((s) => s.brick === "portfolio" && s.state === "ok").map((s) => {
+      const kind = "portfolio";
       const open = preview && preview.kind === kind && preview.folder === r.folder;
-      return `<button class="link" data-kind="${kind}" data-folder="${esc(r.folder)}" data-link="${esc(s.link)}" aria-pressed="${!!open}">${kind === "portfolio" ? "Portfolio entry" : "Web page"}</button>`;
+      return `<button class="link" data-kind="${kind}" data-folder="${esc(r.folder)}" aria-pressed="${!!open}">Portfolio entry</button>`;
     }) : [];
     const commit = stepOf(r, "repo");
     const sha = commit?.state === "ok" && /Committed (\w+)/.exec(commit.detail || "")?.[1];
@@ -593,7 +594,7 @@ function renderRuns() {
     </li>`;
   }).join("");
   list.querySelectorAll(".link").forEach((b) => b.addEventListener("click", () => {
-    openPreview({ kind: b.dataset.kind, folder: b.dataset.folder, link: b.dataset.link });
+    openPreview({ kind: b.dataset.kind, folder: b.dataset.folder });
     renderRuns();
   }));
   list.querySelectorAll(".dot.failed").forEach((d) => d.addEventListener("click", async () => {
@@ -617,6 +618,7 @@ function renderControls() {
     btn.classList.remove("stopping");
     btn.disabled = !$("#prompt").value.trim();
   }
+  $("#cookFirst").disabled = !$("#prompt").value.trim();
 }
 
 $("#prompt").addEventListener("input", (e) => {
@@ -626,6 +628,15 @@ $("#prompt").addEventListener("input", (e) => {
 });
 $("#prompt").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#runForm").requestSubmit(); }
+});
+$("#cookFirst").addEventListener("click", () => {
+  const text = $("#prompt").value.trim();
+  if (!text) return;
+  $("#prompt").value = "";
+  $("#prompt").style.height = "";
+  renderControls();
+  showPage("cooker");
+  window.Cooker?.startNew(text);
 });
 $("#runForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -689,5 +700,7 @@ addEventListener("resize", () => { clearTimeout(fit.t); fit.t = setTimeout(fit, 
 showPage(location.hash.slice(1) || "mesh");
 load();
 </script>
+<script src="/vendor/sketch.js"></script>
+<script src="/cooker.js"></script>
 </body>
 </html>

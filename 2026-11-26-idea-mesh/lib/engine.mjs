@@ -58,18 +58,19 @@ export function engine(env) {
       if (current) current.stop = true;
       return !!current;
     },
-    async start(prompt) {
+    async start(prompt, { folder = null } = {}) {
       if (current) throw Object.assign(new Error("A run is already in progress."), { status: 409 });
+      if (env.lock.by) throw Object.assign(new Error("The Cooker is still working. Run the mesh when it's done."), { status: 409 });
       const mesh = await env.store.mesh();
       const order = runOrder(mesh);
       if (!order.some((b) => !skipReason(b))) throw Object.assign(new Error("No brick is switched on and ready to run."), { status: 400 });
       const run = {
         id: Date.now().toString(36),
         prompt,
-        folder: null,
+        folder,
         state: "running",
         startedAt: new Date().toISOString(),
-        ctx: { prompt },
+        ctx: { prompt, folder },
         steps: order.map((b) => {
           const why = skipReason(b);
           return { brick: b.id, label: b.label, state: why ? "skipped" : "waiting", detail: why };
@@ -89,7 +90,7 @@ export function engine(env) {
     },
     /** Rerun one failed brick of an earlier run, with the context that run left behind. */
     async rerun(runId, brickId) {
-      if (current) throw Object.assign(new Error("Wait for the current run to finish."), { status: 409 });
+      if (current || env.lock.by) throw Object.assign(new Error("Wait for the current run or Cooker job to finish."), { status: 409 });
       const run = (await env.store.runs()).find((r) => r.id === runId);
       const s = run?.steps.find((x) => x.brick === brickId);
       if (!s) throw Object.assign(new Error("That run or brick doesn't exist."), { status: 404 });
