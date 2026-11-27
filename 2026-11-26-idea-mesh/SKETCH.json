@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "frame": {
+    "preset": "desktop",
+    "w": 1280,
+    "h": 800
+  },
+  "shapes": [
+    {
+      "id": "s1",
+      "n": 1,
+      "kind": "nav",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 56,
+      "label": "IdeaMesh",
+      "desc": "Top bar with the app name on the left and a link to the ideas repo on the right. No other navigation, because this one screen is the whole tool."
+    },
+    {
+      "id": "s2",
+      "n": 2,
+      "kind": "input",
+      "x": 24,
+      "y": 80,
+      "w": 1080,
+      "h": 56,
+      "label": "Describe today's idea…",
+      "desc": "The single prompt that starts everything. Free text, so the user can type the idea the way they would say it. This should very much so also either have a zoom in window that would work like ideaCooker so that you can make these features that are in here before doing anything else."
+    },
+    {
+      "id": "s3",
+      "n": 3,
+      "kind": "button",
+      "x": 1120,
+      "y": 80,
+      "w": 136,
+      "h": 56,
+      "label": "Run mesh",
+      "desc": "Sends the prompt through every active brick in order. It is disabled while the input is empty or a run is in progress, and shows a spinner during a run."
+    },
+    {
+      "id": "s4",
+      "n": 4,
+      "kind": "container",
+      "x": 24,
+      "y": 160,
+      "w": 880,
+      "h": 512,
+      "label": "Brick network",
+      "desc": "A canvas that shows how the bricks connect, drawn as a flow from left to right. While a run is in progress, the active brick is highlighted and the arrows fill in as each step finishes.\nA feature is that you can zoom in and out of this"
+    },
+    {
+      "id": "s5",
+      "n": 5,
+      "kind": "circle",
+      "x": 56,
+      "y": 344,
+      "w": 64,
+      "h": 64,
+      "label": "Prompt",
+      "desc": "Start node that represents the prompt from field 2. Clicking it scrolls up to the input."
+    },
+    {
+      "id": "s6",
+      "n": 6,
+      "kind": "line",
+      "x": 120,
+      "y": 376,
+      "w": 48,
+      "h": 0,
+      "label": "",
+      "desc": "Arrow from the prompt to the first brick."
+    },
+    {
+      "id": "s7",
+      "n": 7,
+      "kind": "other",
+      "x": 168,
+      "y": 336,
+      "w": 160,
+      "h": 80,
+      "label": "Ideas repo",
+      "desc": "Brick that writes the dated idea folder and README, then pushes it to the repo. Clicking it opens its settings in the inspector (15). It shows the last commit time."
+    },
+    {
+      "id": "s8",
+      "n": 8,
+      "kind": "line",
+      "x": 328,
+      "y": 376,
+      "w": 64,
+      "h": 0,
+      "label": "",
+      "desc": "Arrow that passes the new idea folder on to the portfolio brick."
+    },
+    {
+      "id": "s9",
+      "n": 9,
+      "kind": "other",
+      "x": 392,
+      "y": 336,
+      "w": 160,
+      "h": 80,
+      "label": "Portfolio + text",
+      "desc": "Brick that adds the idea to the portfolio and generates its portfolio text from the README. Clicking it selects it in the inspector."
+    },
+    {
+      "id": "s10",
+      "n": 10,
+      "kind": "line",
+      "x": 552,
+      "y": 376,
+      "w": 64,
+      "h": 0,
+      "label": "",
+      "desc": "Arrow from the portfolio brick to the website brick. It is drawn dashed while the next brick is only planned."
+    },
+    {
+      "id": "s11",
+      "n": 11,
+      "kind": "other",
+      "x": 616,
+      "y": 336,
+      "w": 160,
+      "h": 80,
+      "label": "Public website · planned",
+      "desc": "Future brick that pushes the idea to a folder on a public website. It is shown greyed out and skipped during runs until it is switched on."
+    },
+    {
+      "id": "s12",
+      "n": 12,
+      "kind": "other",
+      "x": 168,
+      "y": 200,
+      "w": 160,
+      "h": 80,
+      "label": "PassRotor",
+      "desc": "An earlier idea plugged in as a brick, shown to make it clear that ideas can become bricks. Its exact role is still open, for example supplying credentials to the bricks that push."
+    },
+    {
+      "id": "s13",
+      "n": 13,
+      "kind": "line",
+      "x": 248,
+      "y": 280,
+      "w": 0,
+      "h": 56,
+      "label": "",
+      "desc": "Connection from PassRotor down to the Ideas repo brick, showing that one brick can feed another without being in the main row."
+    },
+    {
+      "id": "s14",
+      "n": 14,
+      "kind": "button",
+      "x": 56,
+      "y": 568,
+      "w": 144,
+      "h": 48,
+      "label": "Add brick",
+      "desc": "Opens a picker of available bricks, including other ideas from the repo. The user drops the chosen brick onto the canvas and draws its connections."
+    },
+    {
+      "id": "s15",
+      "n": 15,
+      "kind": "container",
+      "x": 928,
+      "y": 160,
+      "w": 328,
+      "h": 432,
+      "label": "Inspector",
+      "desc": "Shows details for the selected brick so the user can update or upgrade it without changing the rest of the network."
+    },
+    {
+      "id": "s16",
+      "n": 16,
+      "kind": "text",
+      "x": 952,
+      "y": 184,
+      "w": 280,
+      "h": 48,
+      "label": "Portfolio + text · v2",
+      "desc": "Name and version of the selected brick, with an on/off switch next to it so the brick can be skipped during runs."
+    },
+    {
+      "id": "s17",
+      "n": 17,
+      "kind": "list",
+      "x": 952,
+      "y": 248,
+      "w": 280,
+      "h": 248,
+      "label": "Takes · Gives · Settings",
+      "desc": "What the brick takes in (for example the idea folder), what it produces (for example the portfolio entry) and its editable settings, such as the tone of the generated text."
+    },
+    {
+      "id": "s18",
+      "n": 18,
+      "kind": "button",
+      "x": 952,
+      "y": 520,
+      "w": 280,
+      "h": 48,
+      "label": "Upgrade to v3",
+      "desc": "Swaps in a newer version of the selected brick and keeps its connections. It is only shown when an upgrade exists."
+    },
+    {
+      "id": "s19",
+      "n": 19,
+      "kind": "list",
+      "x": 24,
+      "y": 704,
+      "w": 1232,
+      "h": 72,
+      "label": "Run log",
+      "desc": "Latest runs, newest first. Each row shows the idea name, which bricks succeeded or failed, and links to the commit, the portfolio entry and the web page. Clicking a failed step reruns only that brick."
+    },
+    {
+      "id": "sm1kftn4",
+      "n": 20,
+      "kind": "container",
+      "x": 176,
+      "y": 448,
+      "w": 160,
+      "h": 72,
+      "label": "Sketched",
+      "desc": "A blurred box for all the ideas that might not be prototype and ready to run"
+    },
+    {
+      "id": "sh8wely4",
+      "n": 21,
+      "kind": "line",
+      "x": 248,
+      "y": 448,
+      "w": 0,
+      "h": -32,
+      "label": "",
+      "desc": ""
+    },
+    {
+      "id": "sl77po4o",
+      "n": 22,
+      "kind": "button",
+      "x": 848,
+      "y": 176,
+      "w": 32,
+      "h": 24,
+      "label": "+",
+      "desc": "zooming in on the brick network window"
+    },
+    {
+      "id": "sq3mb9cn",
+      "n": 23,
+      "kind": "button",
+      "x": 792,
+      "y": 176,
+      "w": 40,
+      "h": 24,
+      "label": "-",
+      "desc": "zooming out"
+    }
+  ],
+  "note": ""
+}
