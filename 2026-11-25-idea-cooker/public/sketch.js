@@ -246,7 +246,7 @@
       if (!s) {
         const missing = model.shapes.filter((f) => !String(f.desc || "").trim()).length;
         insp.innerHTML = `<h3>Figures</h3>
-          <p class="hint">${model.shapes.length ? `Click a figure to give it a label and a description. Claude reads both.${missing ? ` ${missing} still ${missing === 1 ? "needs a description" : "need descriptions"} (amber number).` : ""}` : "Pick a figure in the toolbar, then drag on the frame (or click to drop it). Give each one a label and a description of what it is and does; Claude reads both."}</p>
+          <p class="hint">${model.shapes.length ? `Click a figure to give it a label and a description. Claude reads both.${missing ? ` ${missing} still ${missing === 1 ? "needs a description" : "need descriptions"} (amber number).` : ""}` : "Let Claude draft a first version (Draft with Claude, above), or pick a figure in the toolbar and drag on the frame. Give each figure a label and a description of what it is and does; Claude reads both."}</p>
           <div class="figs">${model.shapes.slice().sort((a, b) => a.n - b.n).map((f) => `<button type="button" data-pick="${f.id}"><span class="n">#${f.n}</span><span class="t">${esc(f.label || KIND_NAMES[f.kind] || f.kind)}</span>${String(f.desc || "").trim() ? "" : '<span class="warn" title="No description yet"></span>'}</button>`).join("")}</div>
           <p class="hint">Shortcuts: V select · B button · I input · D dropdown · M image · T text · C box · S list · O circle · L arrow · Delete · Ctrl+D duplicate · arrow keys move · Ctrl+Z undo</p>`;
         return;
@@ -418,6 +418,17 @@
       count: () => model.shapes.length,
       missingDescriptions: () => model.shapes.filter((s) => !String(s.desc || "").trim()).map((s) => s.n),
       markSaved() { saved = snapshot(); touch(); },
+      /* Replace the sketch (e.g. with Claude's draft). It's one undo step and stays unsaved until the user saves. */
+      load(next) {
+        const before = snapshot();
+        const p = FRAMES[next?.frame?.preset] ? next.frame.preset : "desktop";
+        model.frame = { preset: p, w: FRAMES[p][0], h: next?.frame?.h || FRAMES[p][1] };
+        model.shapes = (next?.shapes || []).map((s) => ({ ...s, id: s.id || uid() }));
+        sel = null;
+        el.querySelector("[data-frame-sel]").value = p;
+        setTool("select");
+        draw(); inspector(); commit(before);
+      },
       /* A PNG picture of the sketch (no selection or grid), for Claude to look at. */
       png() {
         return new Promise((resolve) => {

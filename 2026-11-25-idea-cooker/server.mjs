@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { inspectRepo, pullIfRemote, commitAndPush } from "./lib/git.mjs";
 import { listIdeas, updateIdeaStatus, STATUSES } from "./lib/ideas.mjs";
-import { cookIdea, reviseIdea, describeImport, describeLinked, askQuestions, reviewSketch, today } from "./lib/generate.mjs";
+import { cookIdea, reviseIdea, describeImport, describeLinked, askQuestions, reviewSketch, draftSketch, today } from "./lib/generate.mjs";
 import { cleanSketch, sketchPngBuffer } from "./lib/sketch.mjs";
 import { importIntoRepo, kebab } from "./lib/importer.mjs";
 import { chatStore } from "./lib/chats.mjs";
@@ -382,6 +382,34 @@ async function handle(req, res) {
       const g = await commitAndPush(cfg.repoPath, [folder], `Edit architecture: ${folder}`, { push: cfg.push, log });
       if (g.committed) await chats.append(folder, [{ role: "note", text: "You edited the architecture diagram.", at: now() }]);
       return { folder, ...g };
+    });
+    return send(res, 202, { jobId: job.id });
+  }
+
+  // Claude drafts a UI sketch. Nothing is saved: the page shows the draft in the editor and the user saves it.
+  if (req.method === "POST" && (m = p.match(/^\/api\/ideas\/([\w.-]+)\/sketch\/draft$/))) {
+    const cfg = await requireRepo();
+    const folder = checkFolder(m[1]);
+    const dir = path.join(cfg.repoPath, folder);
+    if (!(await fs.stat(dir).catch(() => null))?.isDirectory()) throw httpError(404, "That idea doesn't exist.");
+    const { instructions } = await readJson(req);
+    const text = String(instructions || "").trim().slice(0, 4000);
+    const asked = text || "Draft a first UI sketch for this idea.";
+    const job = startJob("draft", { folder, text: asked }, async ({ log, job }) => {
+      const chat = await chats.get(folder);
+      const link = await readLink(cfg.repoPath, folder);
+      const repo = link ? parseRepoUrl(link.repo) : null;
+      const clone = repo ? await ensureClone(REPOS_DIR, repo, log) : null;
+      const hasSketch = !!(await fs.stat(path.join(dir, SKETCH_FILE)).catch(() => null));
+      const r = await draftSketch({ repoPath: cfg.repoPath, folder, instructions: text, hasSketch, sessionId: chat.sessionId, clone, cloneLabel: repo?.label, model: cfg.model, rules: activeRules(cfg), log });
+      const sketch = cleanSketch(r.sketch);
+      if (!sketch.shapes.length) throw new Error("Claude's draft was empty. Try again.");
+      log(`Draft: ${sketch.shapes.length} figures (${sketch.frame.preset})`);
+      await chats.append(folder, [
+        { role: "user", text: asked, at: now() },
+        { role: "assistant", text: `${r.note || "Here's a first draft of the UI."}\n\nIt's in the Sketch tab, not saved yet: change what you like, then Save.`, at: now() },
+      ], r.sessionId);
+      return { folder, sketch, note: r.note };
     });
     return send(res, 202, { jobId: job.id });
   }

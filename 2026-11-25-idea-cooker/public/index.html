@@ -673,7 +673,7 @@ function pendingHtml(p) {
     steps = `<ul class="steps">${labels.map(([k, l]) => `<li class="${s[k]}"><span class="ind"></span>${l}</li>`).join("")}</ul>`;
   }
   const chips = tools.length ? `<div class="tools">${[...new Set(tools)].map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : "";
-  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…", remove: "Removing…", questions: "Claude is reading up and preparing questions…", arch: "Saving the diagram…", sketch: "Saving the sketch…", review: "Claude is looking at your sketch…" }[p.kind] || (p.saveOnly ? "Saving your idea…" : "Cooking your idea…");
+  const label = { revise: "Claude is working on it…", import: "Importing…", link: "Linking…", remove: "Removing…", questions: "Claude is reading up and preparing questions…", arch: "Saving the diagram…", sketch: "Saving the sketch…", review: "Claude is looking at your sketch…", draft: "Claude is drafting the UI…" }[p.kind] || (p.saveOnly ? "Saving your idea…" : "Cooking your idea…");
   return `${p.userText ? `<div class="msg user">${esc(p.userText)}</div>` : ""}
     <div class="msg assistant"><div class="working"><span class="spinner"></span>${label}</div>${steps}${chips}</div>`;
 }
@@ -935,20 +935,39 @@ function renderSketch(idea, body) {
     const editor = window.SketchEditor.mount(body, sketch, { onDirty: () => syncSketchButtons() });
     state.sketch = { folder: idea.folder, editor };
     editor.actions.innerHTML = `
+      <button class="btn" type="button" id="skDraft" title="Claude lays out a first version from the idea; you edit it and save">Draft with Claude</button>
       <button class="btn" type="button" id="skSave">Save</button>
       <button class="btn" type="button" id="skReview" title="Claude looks at the sketch and replies in the chat; nothing is built">Ask for feedback</button>
       <button class="btn primary" type="button" id="skBuild">Build from sketch</button>`;
+    $("skDraft").addEventListener("click", () => draftSketchNow());
     $("skSave").addEventListener("click", () => saveSketch());
     $("skReview").addEventListener("click", reviewSketchNow);
     $("skBuild").addEventListener("click", buildFromSketch);
     syncSketchButtons();
+    if (state.autoDraft === idea.folder) { state.autoDraft = null; draftSketchNow({ auto: true }); }
   });
+}
+
+/* Claude lays out a first version. It lands in the editor unsaved (one undo step), and its note goes in the chat. */
+async function draftSketchNow({ auto = false } = {}) {
+  const sk = state.sketch;
+  if (!sk || state.pending) return;
+  if (!auto && sk.editor.count() && !confirm("Replace the sketch in the editor with a new draft from Claude? You can undo it.")) return;
+  const folder = sk.folder;
+  const job = await runJob("draft", () => api("POST", `/api/ideas/${encodeURIComponent(folder)}/sketch/draft`, {}), "Draft a first UI sketch for this idea.", folder);
+  if (job?.state === "done" && state.sketch?.folder === folder) state.sketch.editor.load(job.result.sketch);
+  if (state.folder === folder) await loadChat();
+  renderSidebar();
+  renderChat();
+  syncSketchButtons();
 }
 
 function syncSketchButtons() {
   const sk = state.sketch;
   if (!sk || !$("skSave")) return;
   const empty = !sk.editor.count();
+  $("skDraft").disabled = !!state.pending;
+  $("skDraft").classList.toggle("primary", empty);
   $("skSave").disabled = !!state.pending || !sk.editor.isDirty() || empty;
   $("skSave").textContent = sk.editor.isDirty() ? "Save" : "Saved";
   $("skReview").disabled = $("skBuild").disabled = !!state.pending || empty;
@@ -1005,6 +1024,7 @@ async function sketchFirst() {
   autosize();
   const job = await runJob("cook", () => api("POST", "/api/chat", { message: text, saveOnly: true }), text, null, { saveOnly: true });
   if (job?.state === "done") {
+    state.autoDraft = job.result.folder; // the Sketch tab opens with Claude drafting the first version
     await select(job.result.folder);
     state.tab = "sketch";
     setPanel(true);
@@ -1083,7 +1103,7 @@ async function follow(jobId, kind, userText, folder, extra = {}) {
   await loadIdeas();
   if (job.state === "done") {
     state.previewVersion = Date.now();
-    if (!["status", "questions", "arch", "remove", "sketch", "review"].includes(kind)) state.panelOpen = true; // show what changed, like a chat app opening its canvas
+    if (!["status", "questions", "arch", "remove", "sketch", "review", "draft"].includes(kind)) state.panelOpen = true; // show what changed, like a chat app opening its canvas
   } else showError(job.error || "Something went wrong.");
   return job;
 }

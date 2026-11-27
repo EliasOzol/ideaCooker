@@ -273,6 +273,13 @@ try {
   chat = await api("GET", `/api/chat/${habit}`);
   ok(chat.messages.some((mm) => mm.role === "note" && /UI sketch \(3 figures\)/.test(mm.text)) && chat.messages.at(-1).role === "assistant", "the chat has the sketch note and Claude's feedback");
   ok((await fetch(`${base}/sketch.js`)).ok, "the sketch editor is served");
+  const beforeDraft = await must(remote, ["rev-parse", "main"]);
+  job = await waitJob((await api("POST", `/api/ideas/${habit}/sketch/draft`, {})).jobId);
+  ok(job.state === "done" && job.result.sketch.shapes.length === 3 && job.result.sketch.shapes.every((s) => s.id && s.kind), `Claude's draft comes back as a cleaned sketch (${job.error || job.result.sketch.shapes.length + " figures"})`);
+  ok((await must(remote, ["rev-parse", "main"])) === beforeDraft, "a draft isn't saved or committed until the user saves it");
+  ok((await api("GET", `/api/ideas/${habit}/sketch`)).sketch.shapes.length === 3 && (await api("GET", `/api/ideas/${habit}/sketch`)).sketch.shapes[0].label === "Add a habit", "the saved sketch is untouched by the draft");
+  chat = await api("GET", `/api/chat/${habit}`);
+  ok(/not saved yet/.test(chat.messages.at(-1).text), "the draft's note is in the chat");
 
   // --- save an idea without building it
   job = await waitJob((await api("POST", "/api/chat", { message: "A mug that tells you when your coffee is drinkable", saveOnly: true })).jobId);

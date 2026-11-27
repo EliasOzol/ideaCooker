@@ -426,6 +426,57 @@ Don't build anything and don't change any files: the user will update the sketch
   return runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, readOnly: true }, resume: sessionId, model, rules, allowCommands: false, log, emit });
 }
 
+/**
+ * Claude drafts a first UI sketch (the same format as SKETCH.json) from the idea. Read-only: the draft comes back
+ * as JSON and is shown in the editor unsaved, so the user decides what to keep.
+ * Returns { sketch, note, sessionId }; `sketch` is raw and must be cleaned by the caller.
+ */
+export async function draftSketch({ repoPath, folder, instructions = "", hasSketch = false, sessionId = null, clone = null, cloneLabel = "", model, rules = [], log }) {
+  const root = path.resolve(repoPath);
+  if (FAKE()) {
+    log("[fake mode] sketch draft");
+    return {
+      sessionId: `fake-${folder}`,
+      note: "[fake] A first layout: header, the main action and a list.",
+      sketch: { frame: { preset: "desktop" }, shapes: [
+        { n: 1, kind: "nav", x: 0, y: 0, w: 1280, h: 64, label: "App name", desc: "Name on the left." },
+        { n: 2, kind: "button", x: 40, y: 104, w: 200, h: 48, label: "Start", desc: "Starts the main flow." },
+        { n: 3, kind: "list", x: 40, y: 184, w: 600, h: 400, label: "Items", desc: "Everything you added, newest first." },
+      ] },
+    };
+  }
+  const dir = path.join(root, folder);
+  const prompt = `Draft a first wireframe of the UI for the user's idea${clone ? ` (the linked project ${cloneLabel}; its code is in your working directory)` : ""}, so they have something concrete to react to and edit. Read the idea's README in \`${dir}\` first${clone ? ", and the project's UI code if there is any" : ", and its prototype if there is one"}${hasSketch ? `, and their current sketch \`${path.join(dir, "SKETCH.json")}\` (your draft will replace it in the editor; keep what works)` : ""}.
+${instructions ? `\nWhat the user wants from this draft:\n<request>\n${instructions}\n</request>\n` : ""}
+A wireframe is a set of numbered figures on one screen. Reply with ONLY a JSON object in a \`\`\`json code block:
+{"frame": {"preset": "desktop"}, "shapes": [{"n": 1, "kind": "nav", "x": 0, "y": 0, "w": 1280, "h": 64, "label": "…", "desc": "…"}], "note": "…"}
+
+- frame.preset: "desktop" (1280×800), "tablet" (834×1112) or "phone" (390×844); pick what the idea is mainly used on.
+- kind: one of container, button, input, dropdown, image, text, list, circle, line, nav, other. Use container for sections that group other figures, line for an arrow (x, y is the start; w, h is the offset to the end).
+- x, y, w, h in pixels inside the frame, on an 8px grid. Leave sensible margins (at least 16px) and gaps, keep things aligned, and don't overlap figures except figures placed inside a container.
+- label: a few words shown inside the figure (the button text, the field's placeholder, the heading).
+- desc: one or two sentences on what it is and what it does when used, concrete enough to build from.
+- 6 to 20 figures for the main screen, numbered in reading order. Show the core flow of the idea, not every detail.
+- note: two or three sentences for the chat: the layout in short, and what you'd like the user to decide or check first.
+
+Don't write or change any files.`;
+  const r = await runClaude({ root, prompt, scope: { type: "folder", folder, clone, cloneLabel, readOnly: true }, resume: sessionId, model, rules, allowCommands: false, log, emit: () => {} });
+  const j = extractJson(r.reply);
+  if (!j || !Array.isArray(j.shapes)) throw new Error("Claude's draft couldn't be read. Try again.");
+  return { sketch: { frame: j.frame, shapes: j.shapes }, note: String(j.note || "").trim().slice(0, 1500), sessionId: r.sessionId };
+}
+
+/** The first JSON object in a reply: the outermost braces first, then a fenced block. */
+function extractJson(text) {
+  const s = String(text || "");
+  const candidates = [s.slice(s.indexOf("{"), s.lastIndexOf("}") + 1), (s.match(/```(?:json)?\s*([\s\S]*?)```/) || [])[1]];
+  for (const c of candidates) {
+    if (!c) continue;
+    try { const j = JSON.parse(c); if (j && typeof j === "object") return j; } catch {}
+  }
+  return null;
+}
+
 /** Pull the JSON out of Claude's reply and keep only well-formed questions. */
 export function parseQuestions(text) {
   const s = String(text || "");
