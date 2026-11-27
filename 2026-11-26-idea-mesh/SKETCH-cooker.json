@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "frame": { "preset": "desktop", "w": 1280, "h": 800 },
+  "shapes": [
+    { "id": "c1", "n": 1, "kind": "nav", "x": 0, "y": 0, "w": 1280, "h": 56, "label": "IdeaMesh   Cooker · Mesh · Integration", "desc": "Same top bar as the other pages, with Cooker selected." },
+    { "id": "c2", "n": 2, "kind": "list", "x": 24, "y": 80, "w": 256, "h": 640, "label": "Bricks in the making", "desc": "Bricks and ideas you are cooking, each with its ring colour (red sketched, yellow prototype). Selecting one loads its chat and panel. A prompt sent from the Mesh page shows up here as a new entry." },
+    { "id": "c3", "n": 3, "kind": "button", "x": 24, "y": 736, "w": 256, "h": 40, "label": "New brick", "desc": "Starts an empty chat for a new brick." },
+    { "id": "c4", "n": 4, "kind": "container", "x": 304, "y": 80, "w": 464, "h": 696, "label": "Chat", "desc": "Idea Cooker's chat for the selected brick, reused as is. Claude asks its design questions here before it builds anything." },
+    { "id": "c5", "n": 5, "kind": "list", "x": 320, "y": 96, "w": 432, "h": 568, "label": "Messages and design questions", "desc": "The conversation, with design questions shown as option buttons. While Claude is working, a 'Cooking…' line appears at the bottom. If Claude Code isn't logged in, an error explains how to log in." },
+    { "id": "c6", "n": 6, "kind": "input", "x": 320, "y": 680, "w": 336, "h": 80, "label": "What should this brick do?", "desc": "Message to Claude. Enter sends it, and Shift+Enter adds a new line." },
+    { "id": "c7", "n": 7, "kind": "button", "x": 672, "y": 680, "w": 80, "h": 80, "label": "Send", "desc": "Sends the message. It is disabled while the field is empty or Claude is still replying." },
+    { "id": "c8", "n": 8, "kind": "container", "x": 792, "y": 80, "w": 464, "h": 696, "label": "Panel", "desc": "Idea Cooker's preview panel for the selected brick." },
+    { "id": "c9", "n": 9, "kind": "other", "x": 808, "y": 96, "w": 432, "h": 40, "label": "Prototype · README · Architecture · Sketch", "desc": "Tabs of the panel. Sketch opens by default for a red brick, because that is the gate it has to clear." },
+    { "id": "c10", "n": 10, "kind": "image", "x": 808, "y": 152, "w": 432, "h": 480, "label": "Sketch canvas", "desc": "Idea Cooker's UI sketch editor with numbered figures. 'Draft with Claude' and 'Get feedback' work as they do in Idea Cooker." },
+    { "id": "c11", "n": 11, "kind": "text", "x": 808, "y": 648, "w": 432, "h": 40, "label": "Check: Sketch approved · not yet", "desc": "The brick's check layer status. When a check is not passed, a short reason explains why, for example 'The sketch changed after approval'." },
+    { "id": "c12", "n": 12, "kind": "button", "x": 808, "y": 712, "w": 208, "h": 48, "label": "Approve sketch", "desc": "Marks the sketch as reviewed, which clears the gate. Editing the sketch afterwards resets the approval." },
+    { "id": "c13", "n": 13, "kind": "button", "x": 1032, "y": 712, "w": 208, "h": 48, "label": "Add to mesh", "desc": "Places the brick on the Mesh page and switches to it. It is disabled until the sketch is approved, and the reason shows on hover and focus." }
+  ],
+  "note": "Cooker page: a list of bricks being cooked on the left, Idea Cooker's chat in the middle, and its panel on the right, ending in the 'Sketch approved' gate and 'Add to mesh'. Check whether the bricks list should also show ideas that already exist in the repo."
+}

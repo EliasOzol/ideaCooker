@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "frame": { "preset": "desktop", "w": 1280, "h": 800 },
+  "shapes": [
+    { "id": "i1", "n": 1, "kind": "nav", "x": 0, "y": 0, "w": 1280, "h": 56, "label": "IdeaMesh   Cooker · Mesh · Integration", "desc": "Same top bar, with Integration selected." },
+    { "id": "i2", "n": 2, "kind": "dropdown", "x": 24, "y": 80, "w": 360, "h": 48, "label": "Test idea: 2026-11-26-idea-mesh", "desc": "Picks which idea is sent through the chain. It defaults to the latest idea in the repo." },
+    { "id": "i3", "n": 3, "kind": "button", "x": 400, "y": 80, "w": 176, "h": 48, "label": "Run full chain", "desc": "Runs every live and prototype brick end to end on the chosen idea and pushes the results, just like a real run. During the run it turns into 'Stop', and it is disabled when no brick has cleared its checks." },
+    { "id": "i4", "n": 4, "kind": "text", "x": 600, "y": 80, "w": 656, "h": 48, "label": "Last full run: 3 of 4 bricks passed · 14:02", "desc": "Summary of the latest chain run. Before any run it says 'Not run yet'." },
+    { "id": "i5", "n": 5, "kind": "list", "x": 24, "y": 152, "w": 280, "h": 624, "label": "Chain", "desc": "The bricks in run order (Ideas repo, Portfolio + text, Website · local folder, with PassRotor indented under the repo), each with its ring colour, its time and a '!' icon if it failed. Selecting a brick shows its output in #6." },
+    { "id": "i6", "n": 6, "kind": "container", "x": 328, "y": 152, "w": 928, "h": 624, "label": "Output view", "desc": "Like Idea Cooker's prototype view: what the selected brick actually produced, side by side with the next brick's input." },
+    { "id": "i7", "n": 7, "kind": "other", "x": 344, "y": 168, "w": 896, "h": 40, "label": "Repo folder · Portfolio entry · Local website", "desc": "Tabs that jump between the three outputs of the chain. The tab for the selected brick is highlighted." },
+    { "id": "i8", "n": 8, "kind": "image", "x": 344, "y": 224, "w": 896, "h": 400, "label": "Live preview", "desc": "Renders the output: the README for the repo folder, the portfolio entry as it will look, and the local website page in a sandboxed frame. While a brick is running it shows a loading state, and for a failed brick it shows the error." },
+    { "id": "i9", "n": 9, "kind": "list", "x": 344, "y": 640, "w": 768, "h": 120, "label": "Hand-off checks", "desc": "For each connection: did the brick's output match what the next brick takes in, and the result of each check layer. A failed row says what was missing." },
+    { "id": "i10", "n": 10, "kind": "button", "x": 1128, "y": 640, "w": 112, "h": 48, "label": "Rerun brick", "desc": "Reruns only the selected brick with the input it had last time. It is disabled while a run is in progress." },
+    { "id": "i11", "n": 11, "kind": "button", "x": 1128, "y": 704, "w": 112, "h": 48, "label": "Open folder", "desc": "Opens the selected brick's local output folder in Explorer." }
+  ],
+  "note": "Integration page: pick a test idea and run the full chain at the top, the chain of bricks on the left, and the output view with live previews and hand-off checks on the right. Decide whether a full-chain test should really push, or write to a scratch branch."
+}
