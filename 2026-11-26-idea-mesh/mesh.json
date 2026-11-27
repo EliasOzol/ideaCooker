@@ -1,0 +1,118 @@
+{
+  "bricks": [
+    {
+      "id": "passrotor",
+      "label": "PassRotor",
+      "version": 1,
+      "ring": "yellow",
+      "runs": false,
+      "enabled": true,
+      "x": 168,
+      "y": 64,
+      "takes": "-",
+      "gives": "Credentials (display only for now)",
+      "checks": {
+        "sketchApproved": true
+      },
+      "settings": {},
+      "note": "An earlier idea plugged in as a brick. It is shown in the network but not called during runs yet."
+    },
+    {
+      "id": "repo",
+      "label": "Ideas repo",
+      "version": 1,
+      "ring": "green",
+      "runs": true,
+      "enabled": true,
+      "x": 168,
+      "y": 200,
+      "takes": "Prompt",
+      "gives": "Dated idea folder with README, committed locally",
+      "checks": {
+        "sketchApproved": true
+      },
+      "settings": {
+        "commit": true
+      },
+      "note": "Writes the README through Idea Cooker (Claude), then commits that folder. It never pushes."
+    },
+    {
+      "id": "portfolio",
+      "label": "Portfolio + text",
+      "version": 1,
+      "ring": "yellow",
+      "runs": true,
+      "enabled": true,
+      "x": 392,
+      "y": 200,
+      "takes": "Idea folder",
+      "gives": "Entry in portfolio.json (Backstage Folio format)",
+      "checks": {
+        "sketchApproved": true
+      },
+      "settings": {
+        "tone": "personal",
+        "kind": "hobby"
+      },
+      "note": "Generates a title, summary and description from the README."
+    },
+    {
+      "id": "website",
+      "label": "Website · local folder",
+      "version": 1,
+      "ring": "yellow",
+      "runs": true,
+      "enabled": true,
+      "x": 616,
+      "y": 200,
+      "takes": "Portfolio entry",
+      "gives": "Page in site/<idea>/",
+      "checks": {
+        "sketchApproved": true
+      },
+      "settings": {},
+      "note": "Writes a static page for the idea and updates site/index.html. Nothing is published."
+    },
+    {
+      "id": "recap",
+      "label": "Weekly recap",
+      "version": 1,
+      "ring": "red",
+      "runs": false,
+      "enabled": false,
+      "x": 168,
+      "y": 336,
+      "takes": "Ideas from the last 7 days",
+      "gives": "A short recap",
+      "checks": {
+        "sketchApproved": false
+      },
+      "settings": {},
+      "note": "Sketched only. It can join runs once its sketch is approved on the Cooker page."
+    }
+  ],
+  "connections": [
+    {
+      "from": "prompt",
+      "to": "repo"
+    },
+    {
+      "from": "passrotor",
+      "to": "repo",
+      "dashed": true
+    },
+    {
+      "from": "recap",
+      "to": "repo",
+      "dashed": true
+    },
+    {
+      "from": "repo",
+      "to": "portfolio"
+    },
+    {
+      "from": "portfolio",
+      "to": "website"
+    }
+  ]
+}

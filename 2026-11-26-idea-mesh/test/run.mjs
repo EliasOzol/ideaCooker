@@ -96,6 +96,10 @@ try {
     assert.equal(page.status, 200);
     assert.match(await page.text(), /A plant that tweets/);
     assert.equal((await fetch(`${base}/site/../server.mjs`)).status, 404);
+    const entry = await call(`/api/portfolio/${run.folder}`);
+    assert.equal(entry.status, 200);
+    assert.equal(entry.body.id, run.folder);
+    assert.equal((await call("/api/portfolio/no-such-idea")).status, 404);
   });
 
   await test("a switched-off brick is skipped", async () => {

@@ -34,7 +34,9 @@ On the Mesh page:
 
 - **Canvas:** pan by dragging, and zoom with the -/Fit/+ buttons or Ctrl+scroll. A ring shows each brick's state: red and blurred for sketched, yellow for prototype, green for live. A "!" in the top-right corner marks a brick that failed in the last run, and hovering it shows the error.
 - **Inspector:** select a brick to see its checks, what it takes and gives, an on/off switch and its settings (commit on/off, text tone, portfolio category). Only "Sketch approved" is checked so far.
-- **Run log:** one dot per brick, with links to the portfolio entry and web page. Clicking a red dot reruns that brick.
+- **Run log:** one dot per brick, and clicking a red dot reruns that brick.
+- **Previews:** "Portfolio entry" and "Web page" open in the right-hand panel in place of the inspector, until you close them (Close or Esc). The entry is shown as it would look in the portfolio, and the page is shown in a scrollable frame. Each preview has an "Open in new tab" link.
+- Dragging the canvas doesn't select text on the page. Text is still selectable when you're not dragging.
 
 The brick layout is fixed by `mesh.json`, which is created when you first change a setting. PassRotor and Weekly recap are display only. The Cooker and Integration tabs say they are coming next. The server's settings come from Idea Cooker's `config.json`: the repo path, the model and your rule sets.
 

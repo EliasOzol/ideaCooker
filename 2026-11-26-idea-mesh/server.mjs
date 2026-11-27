@@ -122,6 +122,11 @@ export async function startServer({
       return;
     }
     if (p === "/portfolio.json") return send(res, 200, await env.store.portfolio());
+    const entry = p.match(/^\/api\/portfolio\/([a-z0-9-]+)$/);
+    if (entry && req.method === "GET") {
+      const item = (await env.store.portfolio()).items.find((i) => i.id === entry[1]);
+      return item ? send(res, 200, item) : send(res, 404, { error: "This entry is no longer in portfolio.json." });
+    }
     if (p.startsWith("/site/")) return serveFile(res, env.store.siteDir, decodeURIComponent(p.slice(6)));
     if (p === "/" || p === "/index.html") return serveFile(res, path.join(here, "public"), "index.html");
     send(res, 404, { error: "Not found" });

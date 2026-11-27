@@ -1,0 +1,29 @@
+{
+  "profile": {
+    "name": "",
+    "role": "",
+    "intro": "",
+    "photo": ""
+  },
+  "items": [
+    {
+      "id": "2026-11-27-weekly-rewind",
+      "title": "Weekly Rewind",
+      "summary": "A weekly look back at what I made and what I started but may have forgotten. Still an idea.",
+      "description": "Weekly Rewind is an idea for a weekly recap. It shows what got made over the past week, and it also points out the things I started and then quietly dropped.\n\nI wanted it because I easily lose track of what I actually did in a week. Half-finished things are the easiest to forget. Without a reminder they just slip away.\n\nNothing is built yet. My first prototype will probably be a small script or page that lists the week's activity in one place and flags anything I haven't touched since. Before building it, I need to decide what the recap covers, where its data comes from, and when and how it gets delivered.",
+      "year": "2026",
+      "tags": [
+        "productivity",
+        "weekly review",
+        "idea"
+      ],
+      "link": "",
+      "hue": 128,
+      "hidden": false,
+      "image": "",
+      "kind": "hobby",
+      "course": "",
+      "courseUrl": ""
+    }
+  ]
+}
